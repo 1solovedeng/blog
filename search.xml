@@ -4,16 +4,16 @@
   
     
     <entry>
-      <title>声明-2025-5-15</title>
-      <link href="/posts/%E5%A3%B0%E6%98%8E-2025-5-15/"/>
-      <url>/posts/%E5%A3%B0%E6%98%8E-2025-5-15/</url>
+      <title>综合声明 (2025-05-20)</title>
+      <link href="/posts/%E7%BB%BC%E5%90%88%E5%A3%B0%E6%98%8E-2025-05-20/"/>
+      <url>/posts/%E7%BB%BC%E5%90%88%E5%A3%B0%E6%98%8E-2025-05-20/</url>
       
-        <content type="html"><![CDATA[<h1 id="声明-2025-5-15"><a href="#声明-2025-5-15" class="headerlink" title="声明(2025-5-15)"></a>声明(2025-5-15)</h1><p>感谢大家一直以来对我的博客的关注与支持！</p><p>在过去的内容创作过程中，我逐渐意识到，部分文章在质量、深度和表达上仍有较大提升空间。作为一个持续学习和成长的个人创作者，我深感有责任对已有内容进行反思和优化。</p><p>因此，我决定对博客中部分文章进行重写和更新，以提升整体内容质量。这一过程可能需要一定的时间，在此期间，博客的更新频率可能会有所调整，敬请谅解。</p><ol><li><p><strong>内容质量升级计划</strong>  </p><ul><li>经自我审查，早期文章存在<strong>代码示例不足、技术解析深度不够</strong>等问题</li><li>将对历史文章进行全面重构，新增：<ul><li>🖼️ <strong>可视化流程图</strong>说明技术原理</li><li>💻 <strong>完整代码段+逐行注释解析</strong></li><li>🧩 <strong>典型应用场景</strong>及最佳实践</li></ul></li></ul></li><li><p><strong>阶段性更新调整</strong>  </p><ul><li>即日起延缓各种文章的发布，优先进行内容质量升级</li><li>每周六&#x2F;日将：<br>✅ 重制2-3篇旧文（含案例升级）<br>✅ 在<a href="https://github.com/1solovedeng">Github</a>同步开源代码片段</li></ul></li></ol><hr><p>✨ <strong>博客网址：</strong> <a href="https://solovedeng.top/">solovedeng.top</a><br>🎥 <strong>同步平台：</strong> 抖音 &#x2F; B站：solove等（将陆续更新相关内容）<br>🌟 <strong>欢迎关注：</strong> 微信公众号：Solove指针驿站</p>]]></content>
+        <content type="html"><![CDATA[<h1 id="综合声明-2025-05-20"><a href="#综合声明-2025-05-20" class="headerlink" title="综合声明 (2025-05-20)"></a>综合声明 (2025-05-20)</h1><p>各位朋友，大家好！感谢你们一直以来对 <strong>Solove</strong> 的关注与支持。经过两个阶段的探索与打磨，博客已于今日完成全面升级，正式进入 <strong>1.0 时代</strong>。在此，我想综合此前 5 月 13 日和 5 月 15 日的声明(已隐藏)，向大家汇报本次更新成果，并分享未来规划。</p><hr><h2 id="一、核心更新亮点"><a href="#一、核心更新亮点" class="headerlink" title="一、核心更新亮点"></a>一、核心更新亮点</h2><ol><li>🆕 <strong>公告卡片 · 支持定位展示</strong>  <ul><li>以卡片形式在页面顶栏展示最新公告，可自动定位读者所在城市或地区。  </li><li>示例：<br><img src="https://res.cloudinary.com/ddacx9czn/image/upload/v1747745301/22dc8b81-f6f1-4dee-b99d-64a8ea7e904d.png" alt="公告卡片示例"></li></ul></li></ol><ul><li>图：公告卡片示例</li></ul><ol start="2"><li>🔒 <strong>安全跳转页面</strong>  <ul><li>对所有外部链接新增中转页，提示访问风险并提供“取消跳转”按钮，避免误操作。  </li><li>示例：<br><img src="https://res.cloudinary.com/ddacx9czn/image/upload/v1747745365/f61dde85-b618-4594-9f9b-068f14ffc56b.png" alt="安全跳转示例"></li></ul></li></ol><ul><li>图：安全跳转示例</li></ul><ol start="3"><li><p>🎨 <strong>响应式设计</strong>  </p><ul><li>全站响应式布局，在手机、平板、PC 上均可获得一致的阅读体验。</li></ul></li><li><p>📑 <strong>文章目录与侧边快速导航</strong>  </p><ul><li>自动生成目录树，支持一键跳转，提升长文阅读效率。</li></ul></li><li><p>💻 <strong>代码高亮 + 复制按钮</strong>  </p><ul><li>多语言代码块高亮展示，右上角显示“复制”图标，一键复制示例代码。</li></ul></li></ol><hr><h2 id="二、持续运营与未来展望"><a href="#二、持续运营与未来展望" class="headerlink" title="二、持续运营与未来展望"></a>二、持续运营与未来展望</h2><ul><li><p><strong>内容输出</strong>：  </p><ul><li>博客已完成整体框架及基础功能搭建，进入“稳定运营”阶段。  </li><li>接下来，将以<strong>每周三篇</strong>原创深度技术文章为主，同时保持<strong>不定期</strong>的学习笔记和生活感悟更新。</li></ul></li><li><p><strong>质量升级</strong>：  </p><ul><li>针对早期文章进行重写和完善已经基本完毕，新增完整流程图、注释、典型应用场景。  </li><li>在 GitHub (<a href="https://github.com/1solovedeng">github.com&#x2F;1solovedeng</a>) 同步开源更多代码片段。</li></ul></li><li><p><strong>互动共创</strong>：  </p><ul><li>欢迎大家在评论区留言、提出建议，也可通过邮箱、抖音、B 站互动。  </li><li>如果你对某个技术主题感兴趣，或希望看到专题教程，欢迎随时留言。</li></ul></li></ul><hr><p>✨ <strong>博客网址：</strong> <a href="https://solovedeng.top/">solovedeng.top</a><br>🌟 <strong>同步平台：</strong> 抖音 &#x2F; B 站：solove 等（更多视频教程陆续更新）<br>📬 <strong>联系邮箱：</strong> <a href="mailto:&#x73;&#x6f;&#108;&#111;&#118;&#101;&#100;&#101;&#x6e;&#x67;&#64;&#103;&#109;&#x61;&#105;&#x6c;&#x2e;&#x63;&#x6f;&#109;">solovedeng@gmail.com</a> </p><p>再次感谢大家一路走来对我的包容与支持！<br>未来我会持续打磨，带来更专业、更有深度的原创内容，期待与你共同成长。  </p><p>— Solove等敬上<br>2025-05-20<br>（520这种日子，愿你始终做自己热爱的事。）</p>]]></content>
       
       
       <categories>
           
-          <category> Statement </category>
+          <category> 声明 </category>
           
       </categories>
       
@@ -79,31 +79,6 @@
             <tag> 链表 </tag>
             
             <tag> 递归 </tag>
-            
-        </tags>
-      
-    </entry>
-    
-    
-    
-    <entry>
-      <title>声明(2025-5-13)</title>
-      <link href="/posts/%E5%A3%B0%E6%98%8E-2025-5-13/"/>
-      <url>/posts/%E5%A3%B0%E6%98%8E-2025-5-13/</url>
-      
-        <content type="html"><![CDATA[<h1 id="声明-2025-5-13"><a href="#声明-2025-5-13" class="headerlink" title="声明(2025-5-13)"></a>声明(2025-5-13)</h1><p>感谢各位朋友对我的博客关注与支持！在此声明：  </p><ol><li><p><strong>初步探索阶段已完成</strong>  </p><ul><li>博客的整体框架、栏目结构及基础功能均已搭建完成。  </li><li>内容组织方式、更新流程也已基本稳定，进入持续运营阶段。</li></ul></li><li><p><strong>接下来将争取每日更新</strong>  </p><ul><li>博客将持续发布原创内容，涵盖技术分享、学习笔记、生活感悟等。  </li><li>保持高频率输出，努力做到<strong>日更不断更</strong>。</li></ul></li><li><p><strong>希望大家喜欢并推荐给更多人</strong>  </p><ul><li>如果你觉得内容不错，欢迎<strong>点赞、收藏、分享</strong>。  </li><li>也请多多<strong>推荐给你的朋友、同学或同行</strong>，让更多人看到这些内容。</li></ul></li><li><p><strong>欢迎相互交流，共同进步</strong>  </p><ul><li>无论你是路过的访客还是长期关注的朋友，都欢迎在评论区留言互动。  </li><li>你也可以通过<strong>邮箱、抖音、B站等平台</strong>联系我，交流经验、提出建议或参与讨论。</li></ul></li></ol><hr><p>✨ <strong>博客网址：</strong> <a href="https://solovedeng.top/">solovedeng.top</a><br>🎥 <strong>同步平台：</strong> 抖音 &#x2F; B站：solove等（将陆续更新相关内容）<br>🌟 <strong>欢迎关注：</strong> 微信公众号：Solove指针驿站<br>📆 <strong>更新承诺：</strong> <strong>每日更新</strong>，持续优化，只为与你共同成长。  </p>]]></content>
-      
-      
-      <categories>
-          
-          <category> Statement </category>
-          
-      </categories>
-      
-      
-        <tags>
-            
-            <tag> Statement </tag>
             
         </tags>
       
