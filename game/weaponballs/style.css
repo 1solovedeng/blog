@@ -1,0 +1,60 @@
+/* Basic styling for our arena game */
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f0f4f8;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+/* Container now matches the smaller canvas size and centers itself in the page */
+#container {
+  position: relative;
+  width: 800px;
+  /* Height accommodates canvas and scoreboard */
+  height: 540px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+#gameCanvas {
+  background-color: #ffffff;
+  border: 2px solid #cccccc;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  display: block;
+  margin: 0 auto;
+}
+
+/* Scoreboard sits beneath the canvas */
+#scoreboard {
+  margin-top: 8px;
+  width: 100%;
+  text-align: center;
+  font-size: 14px;
+  color: #333333;
+}
+
+#restartButton {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  font-size: 16px;
+  border: none;
+  border-radius: 4px;
+  background-color: #007bff;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+#restartButton:hover {
+  background-color: #0056b3;
+}
