@@ -58,12 +58,12 @@
   configTitle: 'solove等的个人网站',
   title: 'solove等的个人网站',
   postAI: '',
-  pageFillDescription: 'Game Settings',
+  pageFillDescription: 'Game Settings如果在某些环境里没有把暴露到全局也可能是文件在部署时没有正确加载显示明显提示帮助排查将一个最小占位注入到全局避免页面直接崩溃仅用于调试避免',
   isPost: false,
   isHome: false,
   isHighlightShrink: false,
   isToc: false,
-  postUpdate: '2025-08-07 11:03:28',
+  postUpdate: '2025-08-20 15:49:51',
   postMainColor: '',
 }</script><noscript><style type="text/css">
   #nav {
@@ -276,11 +276,56 @@ if (true) {
 
     <!-- Weapon configuration modal -->
     <div id="weaponConfigModal" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.85); color:#fff; z-index:2000; overflow:auto;"></div>
+
     <!-- Load configuration and game logic from modular files -->
     <script src="gameConfig.js"></script>
     <script src="utils.js"></script>
     <script src="player.js"></script>
     <script src="game.js"></script>
+
+    <!-- Defensive check: 如果 WEAPON_TYPES 未定义，注入占位并给出可见提示（便于线上调试） -->
+    <script>
+      (function () {
+        function showBanner(msg) {
+          try {
+            const el = document.createElement('div');
+            el.style.position = 'fixed';
+            el.style.top = '10px';
+            el.style.right = '10px';
+            el.style.background = '#ff6b6b';
+            el.style.color = '#fff';
+            el.style.padding = '8px 12px';
+            el.style.borderRadius = '6px';
+            el.style.zIndex = 99999;
+            el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+            el.textContent = msg;
+            document.body.appendChild(el);
+          } catch (e) {
+            console.warn('Could not show banner', e);
+          }
+        }
+
+        if (typeof WEAPON_TYPES === 'undefined') {
+          // 如果 gameConfig.js 在某些环境里没有把 WEAPON_TYPES 暴露到全局，
+          // 也可能是文件在部署时没有正确加载（404），显示明显提示帮助排查。
+          showBanner('Warning: WEAPON_TYPES is undefined. Check that gameConfig.js loaded (Network panel) and file name casing.');
+
+          // 将一个最小占位注入到全局，避免页面直接崩溃（仅用于调试/避免 ReferenceError）
+          window.WEAPON_TYPES = {
+            sword: { name: 'Sword', baseRange: 50, baseDamage: 10, baseSpeed: 1, moveSpeed: 1, thickness: 2 },
+            spear: { name: 'Spear', baseRange: 80, baseDamage: 8, baseSpeed: 1, moveSpeed: 1, thickness: 2 },
+            dagger: { name: 'Dagger', baseRange: 30, baseDamage: 6, baseSpeed: 2, moveSpeed: 1.2, thickness: 1 },
+            bow: { name: 'Bow', baseRange: 120, baseDamage: 9, baseSpeed: 1.5, moveSpeed: 1, thickness: 1 },
+            shield: { name: 'Shield', baseRange: 20, baseDamage: 2, baseSpeed: 0.5, moveSpeed: 0.8, thickness: 6 },
+            staff: { name: 'Staff', baseRange: 60, baseDamage: 7, baseSpeed: 1, moveSpeed: 1, thickness: 2 },
+            scythe: { name: 'Scythe', baseRange: 70, baseDamage: 11, baseSpeed: 0.9, moveSpeed: 1, thickness: 3 },
+            unarmed: { name: 'Unarmed', baseRange: 10, baseDamage: 3, baseSpeed: 1, moveSpeed: 1.1, thickness: 1 },
+            dummy: { name: 'Dummy', baseRange: 10, baseDamage: 0, baseSpeed: 0, moveSpeed: 0, thickness: 1 }
+          };
+          console.warn('Injected placeholder WEAPON_TYPES to avoid ReferenceError. Fix gameConfig.js to restore correct behavior.');
+        }
+      })();
+    </script>
 
     <script>
       // Display any script errors visibly on the page for debugging
@@ -324,7 +369,7 @@ if (true) {
         // Load persisted weapon configuration from localStorage and apply
         // custom values to the global WEAPON_TYPES object. If no
         // configuration exists, nothing will be changed. The stored
-        // structure is an object keyed by weapon type with sub‑objects
+        // structure is an object keyed by weapon type with sub-objects
         // mapping property names to numeric values.
         try {
           const saved = localStorage.getItem('weaponConfig');
