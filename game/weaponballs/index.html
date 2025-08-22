@@ -58,12 +58,12 @@
   configTitle: 'solove等的个人网站',
   title: 'solove等的个人网站',
   postAI: '',
-  pageFillDescription: 'Game Settings简单横幅提示调试用在全局作用域执行代码使用保持全局环境用拉取并脚本用于补救未正确加载的脚本如果返回通常是页面不要执行',
+  pageFillDescription: 'Game Settings',
   isPost: false,
   isHome: false,
   isHighlightShrink: false,
   isToc: false,
-  postUpdate: '2025-08-22 21:32:37',
+  postUpdate: '2025-08-22 21:50:14',
   postMainColor: '',
 }</script><noscript><style type="text/css">
   #nav {
@@ -276,89 +276,12 @@ if (true) {
 
     <!-- Weapon configuration modal -->
     <div id="weaponConfigModal" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.85); color:#fff; z-index:2000; overflow:auto;"></div>
-    <!-- Load configuration and game logic from modular files -->
+
+    <!-- Load configuration and game logic from modular files (only references kept) -->
     <script src="gameConfig.js"></script>
     <script src="utils.js"></script>
     <script src="player.js"></script>
     <script src="game.js"></script>
-
-    <!-- Minimal 修复加载器（仅在关键全局缺失时尝试补救） -->
-    <script>
-      (function() {
-        // 简单横幅提示（调试用）
-        function showBanner(msg, timeout = 10000) {
-          try {
-            const el = document.createElement('div');
-            el.style.position = 'fixed';
-            el.style.top = '10px';
-            el.style.left = '10px';
-            el.style.background = '#f44336';
-            el.style.color = '#fff';
-            el.style.padding = '8px 12px';
-            el.style.zIndex = 100000;
-            el.style.borderRadius = '6px';
-            el.style.fontFamily = 'Arial, sans-serif';
-            el.style.fontSize = '13px';
-            el.textContent = msg;
-            document.body.appendChild(el);
-            if (timeout > 0) setTimeout(() => el.remove(), timeout);
-          } catch (e) { console.warn('showBanner error', e); }
-        }
-
-        // 在全局作用域执行代码（使用 eval 保持全局环境）
-        function evalGlobal(code) {
-          return (0, eval)(code);
-        }
-
-        // 用 fetch 拉取并 eval 脚本（用于补救未正确加载的脚本）
-        async function fetchAndEval(path) {
-          try {
-            const res = await fetch(path, { cache: 'no-store' });
-            if (!res.ok) throw new Error('Fetch failed: ' + res.status + ' ' + res.statusText);
-            const text = await res.text();
-            // 如果返回 HTML（通常是 404 页面），不要执行
-            if (text.trim().startsWith('<')) {
-              throw new Error('Returned content looks like HTML (probably 404/redirect).');
-            }
-            evalGlobal(text);
-            return true;
-          } catch (e) {
-            console.error('fetchAndEval failed for', path, e);
-            throw e;
-          }
-        }
-
-        // 主检查函数：在 DOMContentLoaded 后短延迟运行，检查关键 globals
-        async function ensureGlobals() {
-          const need = [];
-          if (typeof WEAPON_TYPES === 'undefined') need.push('gameConfig.js');
-          if (typeof Game === 'undefined' && typeof window.Game === 'undefined') need.push('game.js');
-          if (need.length === 0) return;
-
-          for (const p of need) {
-            try {
-              await fetchAndEval(p);
-              console.log('補救加载成功：', p);
-            } catch (e) {
-              showBanner('Error loading ' + p + '. 请检查该文件是否部署到站点并可访问（Network）。', 15000);
-            }
-          }
-
-          if (typeof WEAPON_TYPES === 'undefined') {
-            console.warn('WEAPON_TYPES 仍未定义。');
-            showBanner('WEAPON_TYPES 未定义 — 请检查 gameConfig.js 是否正确部署。', 15000);
-          }
-          if (typeof Game === 'undefined' && typeof window.Game === 'undefined') {
-            console.warn('Game 仍未定义。');
-            showBanner('Game 未定义 — 请检查 game.js 是否正确部署。', 15000);
-          }
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-          setTimeout(ensureGlobals, 80);
-        });
-      })();
-    </script>
 
     <script>
       // Display any script errors visibly on the page for debugging
