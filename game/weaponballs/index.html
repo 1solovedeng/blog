@@ -63,7 +63,7 @@
   isHome: false,
   isHighlightShrink: false,
   isToc: false,
-  postUpdate: '2025-08-22 16:00:41',
+  postUpdate: '2025-08-22 16:06:31',
   postMainColor: '',
 }</script><noscript><style type="text/css">
   #nav {
@@ -276,15 +276,16 @@ if (true) {
 
     <!-- Weapon configuration modal -->
     <div id="weaponConfigModal" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.85); color:#fff; z-index:2000; overflow:auto;"></div>
+
     <!-- Load configuration and game logic from modular files -->
-    <!-- 注意：这里把脚本名改为小写，与仓库中实际文件名一致 -->
+    <!-- 注意：脚本名与仓库里文件名必须完全一致（大小写敏感） -->
     <script src="gameConfig.js"></script>
     <script src="utils.js"></script>
     <script src="player.js"></script>
     <script src="game.js"></script>
 
+    <!-- Display any script errors visibly on the page for debugging -->
     <script>
-      // Display any script errors visibly on the page for debugging
       window.onerror = function(msg, url, line, col, err) {
         const div = document.createElement('div');
         div.style.position = 'fixed';
@@ -297,8 +298,10 @@ if (true) {
         div.textContent = 'Error: ' + msg + ' at ' + line + ':' + col;
         document.body.appendChild(div);
       };
+    </script>
 
-      // Menu logic for customizing players and starting the game
+    <!-- Menu & UI logic (保留你原来的脚本) -->
+    <script>
       document.addEventListener('DOMContentLoaded', () => {
         const menu = document.getElementById('menu');
         const playerCountSelect = document.getElementById('playerCount');
@@ -311,33 +314,27 @@ if (true) {
         const scoreboard = document.getElementById('scoreboard');
         const restartButton = document.getElementById('restartButton');
 
-        // Map and canvas controls
         const mapTypeSelect = document.getElementById('mapType');
         const plusSettings = document.getElementById('plusSettings');
         const walkwayInput = document.getElementById('walkwayWidth');
         const canvasWidthInput = document.getElementById('canvasWidth');
         const canvasHeightInput = document.getElementById('canvasHeight');
-        // Hide the game area until start
+
         canvas.style.display = 'none';
         scoreboard.style.display = 'none';
         restartButton.hidden = true;
 
         // Load persisted weapon configuration from localStorage and apply
-        // custom values to the global WEAPON_TYPES object. If no
-        // configuration exists, nothing will be changed. The stored
-        // structure is an object keyed by weapon type with sub-objects
-        // mapping property names to numeric values.
         try {
           const saved = localStorage.getItem('weaponConfig');
           if (saved) {
             const parsed = JSON.parse(saved);
             for (const type in parsed) {
-              if (WEAPON_TYPES[type]) {
+              if (window.WEAPON_TYPES && window.WEAPON_TYPES[type]) {
                 const cfg = parsed[type];
                 for (const prop in cfg) {
-                  // Only overwrite number properties
                   if (typeof cfg[prop] === 'number') {
-                    WEAPON_TYPES[type][prop] = cfg[prop];
+                    window.WEAPON_TYPES[type][prop] = cfg[prop];
                   }
                 }
               }
@@ -347,26 +344,21 @@ if (true) {
           console.warn('Failed to load weapon config', e);
         }
 
-        // Capture a snapshot of the default numeric weapon configuration. This
-        // will be used by the reset button in the weapon configuration modal
-        // to restore WEAPON_TYPES to its original state. Only numeric
-        // properties are stored to avoid copying functions or nested objects.
+        // Capture snapshot of numeric defaults
         const initialWeaponConfig = {};
-        for (const type in WEAPON_TYPES) {
-          initialWeaponConfig[type] = {};
-          const def = WEAPON_TYPES[type];
-          for (const prop in def) {
-            if (typeof def[prop] === 'number') {
-              initialWeaponConfig[type][prop] = def[prop];
+        if (window.WEAPON_TYPES) {
+          for (const type in window.WEAPON_TYPES) {
+            initialWeaponConfig[type] = {};
+            const def = window.WEAPON_TYPES[type];
+            for (const prop in def) {
+              if (typeof def[prop] === 'number') {
+                initialWeaponConfig[type][prop] = def[prop];
+              }
             }
           }
         }
 
-        // Generate player configuration rows based on selected player count
         function updatePlayerConfigs() {
-          // Grab default colors from the global definition if available. Fallback to empty
-          // object to avoid reference errors when the variable is undefined. Using
-          // a local alias speeds up access in the loop below.
           const defaultColors = (typeof DEFAULT_COLORS !== 'undefined' ? DEFAULT_COLORS : {});
           const count = parseInt(playerCountSelect.value);
           playerConfigsDiv.innerHTML = '';
@@ -375,7 +367,6 @@ if (true) {
             row.style.display = 'flex';
             row.style.alignItems = 'center';
             row.style.marginBottom = '6px';
-            // Create HTML for weapon select, color input and HP input
             row.innerHTML = `
               <span style="margin-right:8px;">Player ${i + 1}:</span>
               <label style="margin-right:4px;">Weapon
@@ -387,7 +378,7 @@ if (true) {
                   <option value="shield">Shield</option>
                   <option value="staff">Staff</option>
                   <option value="scythe">Scythe</option>
- <option value="unarmed">Unarmed</option>
+                  <option value="unarmed">Unarmed</option>
                   <option value="dummy">Dummy</option>
                 </select>
               </label>
@@ -399,15 +390,12 @@ if (true) {
               </label>
             `;
             playerConfigsDiv.appendChild(row);
-            // After the row has been inserted, set default color based on weapon
             const weaponSelect = row.querySelector('.weaponSelect');
             const colorInput = row.querySelector('.colorInput');
-            // Set default color to match the selected weapon at creation
             const initialType = weaponSelect.value;
             if (defaultColors && defaultColors[initialType]) {
               colorInput.value = defaultColors[initialType];
             }
-            // Change color when weapon selection changes
             weaponSelect.addEventListener('change', () => {
               const type = weaponSelect.value;
               if (defaultColors && defaultColors[type]) {
@@ -416,33 +404,20 @@ if (true) {
             });
           }
         }
-        // Initialize config rows
+
         updatePlayerConfigs();
-        // Update config rows when player count changes
         playerCountSelect.addEventListener('change', updatePlayerConfigs);
 
-        // Initialize plus settings visibility based on default map type
         plusSettings.style.display = mapTypeSelect.value === 'plus' ? 'block' : 'none';
-
-        // Show/hide walkway width input based on map type
         mapTypeSelect.addEventListener('change', () => {
           plusSettings.style.display = mapTypeSelect.value === 'plus' ? 'block' : 'none';
         });
 
-        // Start the game when the user clicks the start button
         startBtn.addEventListener('click', () => {
-          // Apply selected gravity globally. The GRAVITY constant is
-          // defined with let in gameConfig.js so it can be reassigned.
           const gravityVal = parseFloat(gravityInput.value);
           if (!isNaN(gravityVal)) {
-            // Assign directly to the global GRAVITY variable rather than
-            // setting a property on window. Using window.GRAVITY would
-            // create a new property instead of updating the imported
-            // variable defined with let.
             GRAVITY = gravityVal;
           }
-          // Apply selected map settings globally. Assign to the global
-          // variables MAP_TYPE and WALKWAY_WIDTH (from gameConfig.js)
           MAP_TYPE = mapTypeSelect.value;
           if (MAP_TYPE === 'plus') {
             const wv = parseFloat(walkwayInput.value);
@@ -450,18 +425,15 @@ if (true) {
               WALKWAY_WIDTH = wv;
             }
           }
-          // Apply selected canvas size
           const cw = parseInt(canvasWidthInput.value);
           const ch = parseInt(canvasHeightInput.value);
           if (!isNaN(cw) && cw > 0 && !isNaN(ch) && ch > 0) {
             canvas.width = cw;
             canvas.height = ch;
-            // Adjust container dimensions to wrap the new canvas size and scoreboard
             const container = document.getElementById('container');
             container.style.width = cw + 'px';
             container.style.height = (ch + 40) + 'px';
           }
-          // Build spawn configuration array based on menu selections
           const configs = [];
           const count = parseInt(playerCountSelect.value);
           const children = playerConfigsDiv.children;
@@ -470,33 +442,23 @@ if (true) {
             const weapon = row.querySelector('.weaponSelect').value;
             const color = row.querySelector('.colorInput').value;
             const hp = parseFloat(row.querySelector('.hpInput').value) || 250;
-            // Evenly space players along the width: (i+1)/(count+1)
             const xRel = (i + 1) / (count + 1);
             configs.push({ x: xRel, y: 0.5, weaponType: weapon, color: color, health: hp });
           }
-          // Hide menu and show game area
           menu.style.display = 'none';
           canvas.style.display = '';
           scoreboard.style.display = '';
-          // Start a new game with the custom configuration
           // eslint-disable-next-line no-undef
           game = new Game({ spawnConfigs: configs });
-          // Store current configuration for restarts
           window.currentSpawnConfigs = configs;
-          // Configure restart button to restart with the same settings
           restartButton.onclick = function() {
             game = new Game({ spawnConfigs: window.currentSpawnConfigs });
             this.hidden = true;
           };
         });
 
-        // Build and show the weapon configuration modal when the user
-        // clicks the "Configure Weapons" button. This modal allows
-        // adjusting the base stats and buff values of each weapon type.
         weaponConfigBtn.addEventListener('click', () => {
-          // Clear any existing content
           weaponConfigModal.innerHTML = '';
-          // Build inner container
           const wrapper = document.createElement('div');
           wrapper.style.maxWidth = '900px';
           wrapper.style.margin = '40px auto';
@@ -504,20 +466,17 @@ if (true) {
           wrapper.style.padding = '20px';
           wrapper.style.borderRadius = '8px';
           wrapper.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
-          // Header
           const h = document.createElement('h2');
           h.textContent = 'Weapon Configuration';
           h.style.marginBottom = '10px';
           wrapper.appendChild(h);
-          // Instruction
           const info = document.createElement('p');
           info.textContent = 'Adjust base statistics and buff values for each weapon type. Values persist across sessions.';
           info.style.fontSize = '14px';
           info.style.marginBottom = '20px';
           wrapper.appendChild(info);
-          // Build a form with inputs for each weapon type
           const form = document.createElement('div');
-          // For each weapon type defined in WEAPON_TYPES
+
           for (const type in WEAPON_TYPES) {
             const def = WEAPON_TYPES[type];
             const fieldset = document.createElement('fieldset');
@@ -528,7 +487,6 @@ if (true) {
             legend.textContent = def.name;
             legend.style.padding = '0 6px';
             fieldset.appendChild(legend);
-            // Helper to create labeled inputs
             function addInput(label, prop, step = '1') {
               const container = document.createElement('div');
               container.style.display = 'flex';
@@ -543,30 +501,24 @@ if (true) {
               inp.style.width = '70px';
               inp.dataset.weapon = type;
               inp.dataset.prop = prop;
-              // Use current value or blank if not defined
               const current = def[prop];
               inp.value = typeof current === 'number' ? current : '';
               container.appendChild(lbl);
               container.appendChild(inp);
               fieldset.appendChild(container);
             }
-            // Base stats
+
             addInput('Base Range', 'baseRange');
             addInput('Base Damage', 'baseDamage');
             addInput('Base Speed', 'baseSpeed', '0.001');
             addInput('Move Speed', 'moveSpeed', '0.01');
             addInput('Thickness', 'thickness');
-            // Maximum range a weapon can grow to when buffed. If omitted,
-            // the global MAX_RANGE applies. Allow configuring this to
-            // balance range buffs.
             addInput('Max Range', 'maxRange');
-            // Staff and scythe specific stats
             addInput('Fireball Damage', 'fireballDamage');
             addInput('Fireball Radius', 'fireballRadius');
             addInput('Fireball Cooldown', 'fireballCooldown');
             addInput('Poison Damage', 'poisonDamage');
             addInput('Poison Duration', 'poisonDuration');
-            // Buff stats
             addInput('Buff Damage', 'buffDamage');
             addInput('Buff Range', 'buffRange');
             addInput('Buff Spin', 'buffSpin');
@@ -577,8 +529,8 @@ if (true) {
             addInput('Max Thickness', 'maxThickness');
             form.appendChild(fieldset);
           }
+
           wrapper.appendChild(form);
-          // Buttons
           const btnRow = document.createElement('div');
           btnRow.style.display = 'flex';
           btnRow.style.justifyContent = 'flex-end';
@@ -610,21 +562,16 @@ if (true) {
           btnRow.appendChild(saveBtn);
           wrapper.appendChild(btnRow);
           weaponConfigModal.appendChild(wrapper);
-          // Show the modal
           weaponConfigModal.style.display = 'block';
-          // Cancel just hides the modal without saving
           cancelBtn.onclick = () => {
             weaponConfigModal.style.display = 'none';
           };
-          // Reset restores all weapon stats to their original default values
           resetBtn.onclick = () => {
-            // Remove any persisted configuration from localStorage
             try {
               localStorage.removeItem('weaponConfig');
             } catch (e) {
               console.warn('Failed to remove weapon config', e);
             }
-            // Restore numeric properties on WEAPON_TYPES from the snapshot
             for (const type in initialWeaponConfig) {
               if (WEAPON_TYPES[type]) {
                 const defaults = initialWeaponConfig[type];
@@ -633,7 +580,6 @@ if (true) {
                 }
               }
             }
-            // Update input fields in the modal to reflect default values
             const inputs = weaponConfigModal.querySelectorAll('input[data-weapon]');
             inputs.forEach(inp => {
               const t = inp.dataset.weapon;
@@ -646,11 +592,8 @@ if (true) {
             });
             alert('Weapon configurations have been reset to defaults.');
           };
-          // Save collects values and persists them to localStorage and
-          // updates the global WEAPON_TYPES object
           saveBtn.onclick = () => {
             const configs = {};
-            // Iterate all inputs inside the modal
             const inputs = weaponConfigModal.querySelectorAll('input[data-weapon]');
             inputs.forEach(inp => {
               const w = inp.dataset.weapon;
@@ -659,13 +602,11 @@ if (true) {
               if (!configs[w]) configs[w] = {};
               if (!isNaN(val)) configs[w][prop] = val;
             });
-            // Persist to localStorage
             try {
               localStorage.setItem('weaponConfig', JSON.stringify(configs));
             } catch (e) {
               console.warn('Failed to save weapon config', e);
             }
-            // Apply to global WEAPON_TYPES
             for (const w in configs) {
               const cfg = configs[w];
               if (WEAPON_TYPES[w]) {
@@ -674,7 +615,6 @@ if (true) {
                 }
               }
             }
-            // Hide modal
             weaponConfigModal.style.display = 'none';
           };
         });

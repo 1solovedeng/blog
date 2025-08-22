@@ -19,8 +19,11 @@
 let GRAVITY = 0.0001;
 
 // Base increment for the dagger speed buff. This is multiplied by the
-// number of points added to the weapon speed when the dagger strikes.
-const POINT_SPEED = 0.001;
+// number of points added to the weapon spin to compute angular velocity.
+const POINT_SPEED = 0.0008;
+
+// A small epsilon for collision / floating comparisons
+const EPS = 1e-9;
 
 // Cap the weapon length so it doesn't grow endlessly when gaining range buffs
 const MAX_RANGE = 350;
@@ -35,13 +38,13 @@ const MAX_RANGE = 350;
 // velocities from stacked collisions and gravity. It should be tuned
 // relative to the base speed (≈0.1 px/ms) so that movement feels
 // responsive and bouncy but not chaotic. Increasing it from 0.3 to
-// 0.5 restores a bit more bounce when players collide without allowing
+// 0.5 restores a bit more bounce when players collide without allowin
 // infinite acceleration.
 const MAX_PLAYER_SPEED = 0.5;
 
 // Map settings. MAP_TYPE controls the shape of the playable area. The
 // default value 'rectangle' confines players to the canvas bounds. When
-// set to 'plus', players move within a cross‑shaped corridor defined by
+// set to 'plus', players move within a cross-shaped corridor defined by
 // WALKWAY_WIDTH. These variables are mutable and can be changed via the
 // settings menu at runtime.
 let MAP_TYPE = 'rectangle';
@@ -59,13 +62,12 @@ const DEFAULT_COLORS = {
   dagger: '#02ff03', // neon green
   bow: '#fffe05',    // bright yellow
   shield: '#af7f00', // gold/brown
-  dummy: '#888888'   // grey for dummy targets
-  ,
+  dummy: '#888888',  // grey for dummy targets
   // Dark blue for staff users
   staff: '#007bff',
   // Purple for scythe users
   scythe: '#d600d6',
-  unarmed:'#b5b5b5'
+  unarmed: '#b5b5b5'
 };
 
 // Define weapon types, each with base stats and a buff callback to apply
@@ -93,51 +95,29 @@ const WEAPON_TYPES = {
   },
   spear: {
     name: 'Spear',
-    // Extend spear range from 35 to 45 as per latest tuning
     baseRange: 45,
-    baseDamage: 3,
-    baseSpeed: 0.004,
-    // Slim down spear thickness from 20 to 10; spears are now more precise
-    thickness: 10,
-    // Maximum reach the spear can grow to when gaining range buffs. If
-    // unspecified, the global MAX_RANGE is used. This value can be
-    // configured via the weapon settings menu.
+    baseDamage: 4.5,
+    baseSpeed: 0.009,
+    thickness: 14,
     maxRange: MAX_RANGE,
-    // Damage added on hit
     buffDamage: 3,
-    // Additional range added on hit
-    buffRange: 10,
-    // On hit, add buffDamage and buffRange to the spear
     buff(player) {
+      // Spear: modest damage buff
       player.damage += (this.buffDamage || 0);
-      // Increase weapon length but clamp to MAX_RANGE
-      if (this.buffRange) {
-        // Use this.maxRange if defined, otherwise fall back to global MAX_RANGE
-        const maxR = (typeof this.maxRange === 'number' ? this.maxRange : MAX_RANGE);
-        player.weaponLength = Math.min(player.weaponLength + this.buffRange, maxR);
-      }
     }
   },
   dagger: {
     name: 'Dagger',
-    // Boost dagger reach from 20 to 30 to keep it competitive
     baseRange: 30,
-    baseDamage: 2,
+    baseDamage: 3,
     baseSpeed: 0.02,
     thickness: 10,
-    // Maximum reach for the dagger. Although daggers typically do not
-    // gain range via their buff, this property exists to allow
-    // configuration through the weapon settings menu.
     maxRange: MAX_RANGE,
-    // Additional spin points added on hit. Each point is multiplied by
-    // POINT_SPEED to calculate the angular velocity increase. Defaults to 5.
     buffSpin: 5,
-    buffDamage: 0.5 ,
-    // On hit, increase spin speed by buffSpin * POINT_SPEED regardless of direction
+    buffDamage: 0.5,
     buff(player) {
       const inc = (this.buffSpin || 0) * POINT_SPEED;
       player.damage += (this.buffDamage || 0);
-      // Always increase the magnitude of angular velocity regardless of current direction
       const sign = player.weaponAngularVelocity >= 0 ? 1 : -1;
       player.weaponAngularVelocity = sign * (Math.abs(player.weaponAngularVelocity) + inc);
     }
@@ -153,23 +133,12 @@ const WEAPON_TYPES = {
    */
   bow: {
     name: 'Bow',
-    // Bow shaft length. It still participates in weapon‑weapon collisions
-    // but does not directly harm players.
-    baseRange: 30,
-    // The bow itself inflicts no direct damage.
-    baseDamage: 0,
-    // Moderate spin speed in radians/ms for visual variety.
-    baseSpeed: 0.005,
-    // Thickness similar to dagger for accurate collision detection.
-    thickness: 10,
-    // Maximum reach for the bow's shaft. The bow does not gain range
-    // through its buff, but this property is included for consistency
-    // and to allow configuration.
-    maxRange: MAX_RANGE,
-    // Additional arrows awarded per successful hit. Defaults to 1.
+    baseRange: 150,
+    baseDamage: 9,
+    baseSpeed: 0.015,
+    thickness: 2,
+    baseArrowDamage: 6,
     buffArrows: 1,
-    // Buff applied when an arrow successfully hits an opponent. Each hit
-    // increases the number of arrows fired on the next shot by buffArrows.
     buff(player) {
       if (player.arrowCount === undefined) {
         player.arrowCount = 1;
@@ -188,141 +157,73 @@ const WEAPON_TYPES = {
    */
   shield: {
     name: 'Shield',
-    // Very short reach so the shield stays close to the player. With buffs
-    // applied the shield expands outward but starts as a small plate.
-    baseRange: 5,
-    // The shield itself deals no direct damage on body hits
-    baseDamage: 0,
-    // Rotate at a moderate pace for visual effect
+    baseRange: 20,
+    baseDamage: 2,
     baseSpeed: 0.004,
-    // Start with a relatively wide shield
-    thickness: 30,
-    // Additional width added to the shield on each deflection. Defaults to 5.
-    buffThickness: 5,
-    // Maximum width the shield can reach. Defaults to 80.
-    maxThickness: 80,
-    // Buff: widen the shield by buffThickness pixels on each successful
-    // deflection, clamped by maxThickness. Without a cap, shields could
-    // grow too large and dominate the arena.
+    thickness: 28,
+    buffThickness: 2,
     buff(player) {
-      if (player.weaponThickness === undefined) {
-        player.weaponThickness = this.thickness;
-      }
-      const inc = this.buffThickness || 0;
-      const maxT = this.maxThickness || 80;
-      player.weaponThickness = Math.min(player.weaponThickness + inc, maxT);
-    }
-  }
-  ,
-  /**
-   * Dummy weapon definition.
-   *
-   * Dummies are non‑combatant players used for testing. They do not
-   * possess a weapon, deal damage or spin. A movement speed can be
-   * configured via moveSpeed. The buff function is a no‑op.
-   */
-  dummy: {
-    name: 'Dummy',
-    // No reach because there is no weapon
-    baseRange: 0,
-    // Dummies cannot harm other players
-    baseDamage: 0,
-    // No rotation
-    baseSpeed: 0,
-    // No visible weapon thickness
-    thickness: 0,
-    // Movement speed (pixels/ms) used to set the dummy's initial velocity.
-    // This can be configured via the weapon settings menu. Defaults to 0.1
-    moveSpeed: 0.1,
-    buff(player) {
-      // Dummies gain no buff
+      // On successful deflection, increase thickness so future blocks easier
+      player.weaponThickness = (player.weaponThickness || this.thickness) + (this.buffThickness || 0);
     }
   },
-  /**
-   * Staff weapon definition.
-   *
-   * The staff is a ranged weapon that fires explosive fireballs. Its shaft
-   * cannot harm players directly, but each fireball deals area damage upon
-   * impact. Buffs increase both the fireball's damage and explosion radius.
-   */
   staff: {
     name: 'Staff',
-    // Visible shaft length of the staff. It still participates in weapon
-    // collisions but does not deal body damage.
-    baseRange: 30,
-    baseDamage: 0,
-    baseSpeed: 0.005,
-    thickness: 12,
-    // Movement speed for staff users (pixels/ms)
-    moveSpeed: 0.09,
-    // Fireball stats: base damage and explosion radius (px)
-    fireballDamage: 2,
-    fireballRadius: 50,
-    // Cooldown between fireball shots (ms)
-    fireballCooldown: 1000,
-    // Buff increments for fireball damage and radius on each successful hit
-    buffDamage: 1,
-    buffRadius: 10,
-    buff(player) {
-      // When a fireball deals damage to a player, increase the owner's
-      // fireball damage and radius.
-      if (typeof player.fireballDamage === 'number') {
-        player.fireballDamage += (this.buffDamage || 0);
-      }
-      if (typeof player.fireballRadius === 'number') {
-        player.fireballRadius += (this.buffRadius || 0);
-      }
-    }
-  },
-  /**
-   * Scythe weapon definition.
-   *
-   * The scythe is a melee weapon with a curved blade. It deals low direct
-   * damage but applies a poison effect that damages targets over time.
-   * Buffs increase both the per‑second poison damage and its duration.
-   */
-  scythe: {
-    name: 'Scythe',
-    baseRange: 35,
-    baseDamage: 2,
-    baseSpeed: 0.006,
-    thickness: 15,
-    maxRange: MAX_RANGE,
-    // Poison effect parameters (damage inflicted over entire duration in HP)
-    poisonDamage: 4,
-    poisonDuration: 3000,
-    // Buff amounts when the scythe lands a non‑poison hit
+    baseRange: 60,
+    baseDamage: 7,
+    baseSpeed: 0.01,
+    thickness: 4,
+    // Fireball-specific values
+    fireballDamage: 8,
+    fireballRadius: 12,
+    fireballCooldown: 1200,
     buffDamage: 2,
-    buffDuration: 1000,
-    buff(player) {
-      // Increase poison damage and duration on the owning player
-      if (typeof player.poisonDamage === 'number') {
-        player.poisonDamage += (this.buffDamage || 0);
-      }
-      if (typeof player.poisonDuration === 'number') {
-        player.poisonDuration += (this.buffDuration || 0);
-      }
-    }
-  }
-  ,
-  /**
-   * Unarmed weapon definition.
-   *
-   * An unarmed player has no visible weapon but can deal damage via body
-   * contact. They have increased base movement speed, and each hit increases
-   * their damage and speed further, up to a cap.
-   */
-  unarmed: {
-    name: 'Unarmed',
-    baseRange: 0, // No weapon to draw
-    baseDamage: 5, // Higher base damage for direct contact
-    baseSpeed: 0, // No weapon spin
-    moveSpeed: 1,
-    thickness: 20, // Give the unarmed "weapon" a hitbox for collisions,
-    buffDamage: 0.3,
-
     buff(player) {
       player.damage += (this.buffDamage || 0);
     }
+  },
+  scythe: {
+    name: 'Scythe',
+    baseRange: 70,
+    baseDamage: 11,
+    baseSpeed: 0.009,
+    thickness: 18,
+    poisonDamage: 4,
+    poisonDuration: 3000,
+    buffDamage: 1.5,
+    buff(player) {
+      player.damage += (this.buffDamage || 0);
+    }
+  },
+  unarmed: {
+    name: 'Unarmed',
+    baseRange: 10,
+    baseDamage: 3,
+    baseSpeed: 0.01,
+    thickness: 2
+  },
+  dummy: {
+    name: 'Dummy',
+    baseRange: 10,
+    baseDamage: 0,
+    baseSpeed: 0,
+    thickness: 1
   }
 };
+
+// Ensure globals are attached for environments that may not expose top-level vars
+try {
+  if (typeof window !== 'undefined') {
+    window.WEAPON_TYPES = window.WEAPON_TYPES || (typeof WEAPON_TYPES !== 'undefined' ? WEAPON_TYPES : undefined);
+    window.DEFAULT_COLORS = window.DEFAULT_COLORS || (typeof DEFAULT_COLORS !== 'undefined' ? DEFAULT_COLORS : undefined);
+    window.MAX_RANGE = window.MAX_RANGE || (typeof MAX_RANGE !== 'undefined' ? MAX_RANGE : undefined);
+    window.MAX_PLAYER_SPEED = window.MAX_PLAYER_SPEED || (typeof MAX_PLAYER_SPEED !== 'undefined' ? MAX_PLAYER_SPEED : undefined);
+    window.MAP_TYPE = window.MAP_TYPE || (typeof MAP_TYPE !== 'undefined' ? MAP_TYPE : undefined);
+    window.WALKWAY_WIDTH = window.WALKWAY_WIDTH || (typeof WALKWAY_WIDTH !== 'undefined' ? WALKWAY_WIDTH : undefined);
+    window.GRAVITY = window.GRAVITY || (typeof GRAVITY !== 'undefined' ? GRAVITY : undefined);
+    window.POINT_SPEED = window.POINT_SPEED || (typeof POINT_SPEED !== 'undefined' ? POINT_SPEED : undefined);
+    window.EPS = window.EPS || (typeof EPS !== 'undefined' ? EPS : undefined);
+  }
+} catch (e) {
+  console.warn('Failed to attach game config globals to window', e);
+}
