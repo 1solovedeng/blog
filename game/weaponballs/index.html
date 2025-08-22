@@ -58,12 +58,12 @@
   configTitle: 'solove等的个人网站',
   title: 'solove等的个人网站',
   postAI: '',
-  pageFillDescription: 'Game Settings调试提示样式不会影响游戏布局',
+  pageFillDescription: 'Game Settings调试提示样式不会影响游戏布局保证在尺寸变化时不会错位把必须的变量显式挂到避免加载顺序或模块化导致未定义',
   isPost: false,
   isHome: false,
   isHighlightShrink: false,
   isToc: false,
-  postUpdate: '2025-08-22 16:36:33',
+  postUpdate: '2025-08-22 16:43:21',
   postMainColor: '',
 }</script><noscript><style type="text/css">
   #nav {
@@ -229,6 +229,9 @@ if (true) {
         font-family: Arial, sans-serif;
         font-size: 13px;
       }
+      /* 保证 container 在 canvas 尺寸变化时不会错位 */
+      #container { position: relative; display:inline-block; }
+      #scoreboard { margin-top:8px; color:#fff; font-family:Arial, sans-serif; }
     </style>
   </head>
   <body>
@@ -280,520 +283,498 @@ if (true) {
         <label for="gravityInput">Gravity:&nbsp;</label>
         <input id="gravityInput" type="number" step="0.0001" value="0.0001" style="width:80px;" />
       </div>
+      <!-- Button to open weapon configuration menu -->
       <button id="weaponConfigBtn" style="padding:6px 12px; background:#2196f3; color:white; border:none; cursor:pointer; margin-bottom:10px;">Configure Weapons</button>
       <button id="startGameBtn" style="padding:6px 12px; background:#4caf50; color:white; border:none; cursor:pointer;">Start Game</button>
     </div>
 
+    <!-- Weapon configuration modal -->
     <div id="weaponConfigModal" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.85); color:#fff; z-index:2000; overflow:auto;"></div>
 
-    <!-- ===== inlined gameconfig.js ===== -->
+    <!-- ===== inlined gameConfig (必需全局变量) ===== -->
     <script>
-/*
- * Game configuration and weapon definitions (inlined)
- */
-let GRAVITY = 0.0001;
-const POINT_SPEED = 0.0008;
-const EPS = 1e-9;
-const MAX_RANGE = 350;
-const MAX_PLAYER_SPEED = 0.5;
-let MAP_TYPE = 'rectangle';
-let WALKWAY_WIDTH = 200;
-const DEFAULT_COLORS = {
-  sword: '#ff6466',
-  spear: '#00feff',
-  dagger: '#02ff03',
-  bow: '#fffe05',
-  shield: '#af7f00',
-  dummy: '#888888',
-  staff: '#007bff',
-  scythe: '#d600d6',
-  unarmed: '#b5b5b5'
-};
-const WEAPON_TYPES = {
-  sword: {
-    name: 'Sword',
-    baseRange: 35,
-    baseDamage: 5,
-    baseSpeed: 0.006,
-    thickness: 20,
-    maxRange: MAX_RANGE,
-    buffDamage: 5,
-    buff(player) { player.damage += (this.buffDamage || 0); }
-  },
-  spear: {
-    name: 'Spear',
-    baseRange: 45,
-    baseDamage: 4.5,
-    baseSpeed: 0.009,
-    thickness: 14,
-    maxRange: MAX_RANGE,
-    buffDamage: 3,
-    buff(player) { player.damage += (this.buffDamage || 0); }
-  },
-  dagger: {
-    name: 'Dagger',
-    baseRange: 30,
-    baseDamage: 3,
-    baseSpeed: 0.02,
-    thickness: 10,
-    maxRange: MAX_RANGE,
-    buffSpin: 5,
-    buffDamage: 0.5,
-    buff(player) {
-      const inc = (this.buffSpin || 0) * POINT_SPEED;
-      player.damage += (this.buffDamage || 0);
-      const sign = player.weaponAngularVelocity >= 0 ? 1 : -1;
-      player.weaponAngularVelocity = sign * (Math.abs(player.weaponAngularVelocity) + inc);
-    }
-  },
-  bow: {
-    name: 'Bow',
-    baseRange: 150,
-    baseDamage: 9,
-    baseSpeed: 0.015,
-    thickness: 2,
-    baseArrowDamage: 6,
-    buffArrows: 1,
-    buff(player) {
-      if (player.arrowCount === undefined) player.arrowCount = 1;
-      player.arrowCount += (this.buffArrows || 0);
-    }
-  },
-  shield: {
-    name: 'Shield',
-    baseRange: 20,
-    baseDamage: 2,
-    baseSpeed: 0.004,
-    thickness: 28,
-    buffThickness: 2,
-    buff(player) {
-      player.weaponThickness = (player.weaponThickness || this.thickness) + (this.buffThickness || 0);
-    }
-  },
-  staff: {
-    name: 'Staff',
-    baseRange: 60,
-    baseDamage: 7,
-    baseSpeed: 0.01,
-    thickness: 4,
-    fireballDamage: 8,
-    fireballRadius: 12,
-    fireballCooldown: 1200,
-    buffDamage: 2,
-    buff(player) { player.damage += (this.buffDamage || 0); }
-  },
-  scythe: {
-    name: 'Scythe',
-    baseRange: 70,
-    baseDamage: 11,
-    baseSpeed: 0.009,
-    thickness: 18,
-    poisonDamage: 4,
-    poisonDuration: 3000,
-    buffDamage: 1.5,
-    buff(player) { player.damage += (this.buffDamage || 0); }
-  },
-  unarmed: {
-    name: 'Unarmed',
-    baseRange: 10,
-    baseDamage: 3,
-    baseSpeed: 0.01,
-    thickness: 2
-  },
-  dummy: {
-    name: 'Dummy',
-    baseRange: 10,
-    baseDamage: 0,
-    baseSpeed: 0,
-    thickness: 1
-  }
-};
-// attach globals
-try {
-  if (typeof window !== 'undefined') {
-    window.WEAPON_TYPES = window.WEAPON_TYPES || (typeof WEAPON_TYPES !== 'undefined' ? WEAPON_TYPES : undefined);
-    window.DEFAULT_COLORS = window.DEFAULT_COLORS || (typeof DEFAULT_COLORS !== 'undefined' ? DEFAULT_COLORS : undefined);
-    window.MAX_RANGE = window.MAX_RANGE || (typeof MAX_RANGE !== 'undefined' ? MAX_RANGE : undefined);
-    window.MAX_PLAYER_SPEED = window.MAX_PLAYER_SPEED || (typeof MAX_PLAYER_SPEED !== 'undefined' ? MAX_PLAYER_SPEED : undefined);
-    window.MAP_TYPE = window.MAP_TYPE || (typeof MAP_TYPE !== 'undefined' ? MAP_TYPE : undefined);
-    window.WALKWAY_WIDTH = window.WALKWAY_WIDTH || (typeof WALKWAY_WIDTH !== 'undefined' ? WALKWAY_WIDTH : undefined);
-    window.GRAVITY = window.GRAVITY || (typeof GRAVITY !== 'undefined' ? GRAVITY : undefined);
-    window.POINT_SPEED = window.POINT_SPEED || (typeof POINT_SPEED !== 'undefined' ? POINT_SPEED : undefined);
-    window.EPS = window.EPS || (typeof EPS !== 'undefined' ? EPS : undefined);
-  }
-} catch (e) {
-  console.warn('Failed to attach game config globals to window', e);
-}
+      // gameConfig: 把必须的变量显式挂到 window，避免加载顺序或模块化导致未定义
+      (function() {
+        window.GRAVITY = 0.0001;
+        window.MAP_TYPE = 'rectangle';
+        window.WALKWAY_WIDTH = 200;
+        window.MAX_PLAYER_SPEED = 0.5;
+        window.MAX_RANGE = 350;
+        window.DEFAULT_COLORS = {
+          sword: '#ff6466',
+          spear: '#00feff',
+          dagger: '#02ff03',
+          bow: '#fffe05',
+          shield: '#af7f00',
+          staff: '#007bff',
+          scythe: '#d600d6',
+          unarmed: '#b5b5b5',
+          dummy: '#888888'
+        };
+
+        window.POINT_SPEED = 0.0008;
+        window.EPS = 1e-9;
+
+        window.WEAPON_TYPES = {
+          sword: {
+            name: 'Sword',
+            baseRange: 35,
+            baseDamage: 5,
+            baseSpeed: 0.006,
+            thickness: 20,
+            maxRange: window.MAX_RANGE,
+            buffDamage: 5,
+            buff: function(player) {
+              if (!player) return;
+              player.damage = (player.damage || this.baseDamage) + (this.buffDamage || 0);
+            }
+          },
+          spear: {
+            name: 'Spear',
+            baseRange: 45,
+            baseDamage: 4.5,
+            baseSpeed: 0.009,
+            thickness: 14,
+            maxRange: window.MAX_RANGE,
+            buffDamage: 3,
+            buff: function(player) {
+              if (!player) return;
+              player.damage = (player.damage || this.baseDamage) + (this.buffDamage || 0);
+            }
+          },
+          dagger: {
+            name: 'Dagger',
+            baseRange: 30,
+            baseDamage: 3,
+            baseSpeed: 0.02,
+            thickness: 10,
+            maxRange: window.MAX_RANGE,
+            buffSpin: 5,
+            buffDamage: 0.5,
+            buff: function(player) {
+              if (!player) return;
+              const inc = (this.buffSpin || 0) * window.POINT_SPEED;
+              player.damage = (player.damage || this.baseDamage) + (this.buffDamage || 0);
+              const sign = player.weaponAngularVelocity >= 0 ? 1 : -1;
+              player.weaponAngularVelocity = sign * (Math.abs(player.weaponAngularVelocity || 0) + inc);
+            }
+          },
+          bow: {
+            name: 'Bow',
+            baseRange: 150,
+            baseDamage: 9,
+            baseSpeed: 0.015,
+            thickness: 2,
+            baseArrowDamage: 6,
+            buffArrows: 1,
+            buff: function(player) {
+              if (!player) return;
+              player.arrowCount = (player.arrowCount || 1) + (this.buffArrows || 0);
+            }
+          },
+          shield: {
+            name: 'Shield',
+            baseRange: 20,
+            baseDamage: 2,
+            baseSpeed: 0.004,
+            thickness: 28,
+            buffThickness: 2,
+            buff: function(player) {
+              if (!player) return;
+              player.weaponThickness = (player.weaponThickness || this.thickness) + (this.buffThickness || 0);
+            }
+          },
+          staff: {
+            name: 'Staff',
+            baseRange: 60,
+            baseDamage: 7,
+            baseSpeed: 0.01,
+            thickness: 4,
+            fireballDamage: 8,
+            fireballRadius: 12,
+            fireballCooldown: 1200,
+            buffDamage: 2,
+            buff: function(player) {
+              if (!player) return;
+              player.damage = (player.damage || this.baseDamage) + (this.buffDamage || 0);
+            }
+          },
+          scythe: {
+            name: 'Scythe',
+            baseRange: 70,
+            baseDamage: 11,
+            baseSpeed: 0.009,
+            thickness: 18,
+            poisonDamage: 4,
+            poisonDuration: 3000,
+            buffDamage: 1.5,
+            buff: function(player) {
+              if (!player) return;
+              player.damage = (player.damage || this.baseDamage) + (this.buffDamage || 0);
+            }
+          },
+          unarmed: {
+            name: 'Unarmed',
+            baseRange: 10,
+            baseDamage: 3,
+            baseSpeed: 0.01,
+            thickness: 2,
+            buff: function() {}
+          },
+          dummy: {
+            name: 'Dummy',
+            baseRange: 10,
+            baseDamage: 0,
+            baseSpeed: 0,
+            thickness: 1,
+            buff: function() {}
+          }
+        };
+      })();
     </script>
 
-    <!-- ===== inlined game.js ===== -->
+    <!-- ===== inlined core game (game.js) ===== -->
     <script>
-/*
- * Inlined game.js (contains Player, Arrow, Fireball, Game, etc.)
- */
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-function now() { return performance && performance.now ? performance.now() : Date.now(); }
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
-}
-function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
-function randInRange(a, b) { return a + Math.random() * (b - a); }
-function degToRad(d) { return d * Math.PI / 180; }
-function dist2(ax, ay, bx, by) {
-  const dx = ax - bx;
-  const dy = ay - by;
-  return dx * dx + dy * dy;
-}
-class Player {
-  constructor(opts = {}) {
-    this.x = (opts.x !== undefined) ? opts.x : canvas.width / 2;
-    this.y = (opts.y !== undefined) ? opts.y : canvas.height / 2;
-    this.vx = 0; this.vy = 0;
-    this.radius = opts.radius || 12;
-    this.color = opts.color || '#ffffff';
-    this.health = opts.health || (opts.hp || 250);
-    this.weaponType = opts.weaponType || 'sword';
-    this.weaponAngle = 0;
-    this.weaponAngularVelocity = 0;
-    this.weaponLength = (opts.weaponLength !== undefined) ? opts.weaponLength : 50;
-    this.weaponThickness = (opts.weaponThickness !== undefined) ? opts.weaponThickness : 4;
-    this.weaponSpin = 0;
-    this.damage = 0;
-    this.isAlive = true;
-    this.spawnAt = now();
-    this.lastHitAt = 0;
-    this.invulnerableUntil = 0;
-    this.id = opts.id || Math.floor(Math.random() * 1e9);
-    this.arrowCount = opts.arrowCount || 1;
-  }
-  integrate(dt) {
-    if (!this.isAlive) return;
-    if (typeof GRAVITY !== 'undefined') this.vy += GRAVITY * dt;
-    if (typeof MAX_PLAYER_SPEED !== 'undefined') {
-      const sp = Math.hypot(this.vx, this.vy);
-      if (sp > MAX_PLAYER_SPEED) {
-        const s = MAX_PLAYER_SPEED / sp;
-        this.vx *= s; this.vy *= s;
-      }
-    }
-    this.x += this.vx * dt; this.y += this.vy * dt;
-    if (MAP_TYPE === 'rectangle' || typeof MAP_TYPE === 'undefined') {
-      if (this.x < this.radius) { this.x = this.radius; this.vx = -this.vx * 0.6; }
-      if (this.x > canvas.width - this.radius) { this.x = canvas.width - this.radius; this.vx = -this.vx * 0.6; }
-      if (this.y < this.radius) { this.y = this.radius; this.vy = -this.vy * 0.6; }
-      if (this.y > canvas.height - this.radius) { this.y = canvas.height - this.radius; this.vy = -this.vy * 0.6; }
-    } else if (MAP_TYPE === 'plus') {
-      const halfW = canvas.width / 2; const halfH = canvas.height / 2;
-      const halfWalk = WALKWAY_WIDTH / 2;
-      if (Math.abs(this.x - halfW) > halfWalk && Math.abs(this.y - halfH) > halfWalk) {
-        const dx = Math.abs(this.x - halfW) - halfWalk;
-        const dy = Math.abs(this.y - halfH) - halfWalk;
-        if (dx > dy) {
-          if (this.x < halfW) this.x = halfW - halfWalk;
-          else this.x = halfW + halfWalk;
-          this.vx = -this.vx * 0.6;
-        } else {
-          if (this.y < halfH) this.y = halfH - halfWalk;
-          else this.y = halfH + halfWalk;
-          this.vy = -this.vy * 0.6;
+      (function() {
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function now() { return performance && performance.now ? performance.now() : Date.now(); }
+        function roundRect(ctx, x, y, w, h, r) {
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.arcTo(x + w, y, x + w, y + h, r);
+          ctx.arcTo(x + w, y + h, x, y + h, r);
+          ctx.arcTo(x, y + h, x, y, r);
+          ctx.arcTo(x, y, x + w, y, r);
+          ctx.closePath();
         }
-      }
-    }
-    this.weaponAngle += this.weaponAngularVelocity * dt;
-  }
-  render(ctx) {
-    ctx.save();
-    ctx.fillStyle = this.color;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fill();
-    const wt = WEAPON_TYPES && WEAPON_TYPES[this.weaponType] ? WEAPON_TYPES[this.weaponType] : null;
-    const len = this.weaponLength;
-    const ang = this.weaponAngle;
-    const sx = this.x + Math.cos(ang) * this.radius;
-    const sy = this.y + Math.sin(ang) * this.radius;
-    if (wt) ctx.lineWidth = this.weaponThickness || (wt.thickness || 4);
-    else ctx.lineWidth = this.weaponThickness || 4;
-    ctx.strokeStyle = '#ddd';
-    ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    ctx.lineTo(this.x + Math.cos(ang) * (this.radius + len), this.y + Math.sin(ang) * (this.radius + len));
-    ctx.stroke();
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.arc(this.x + Math.cos(ang) * (this.radius + len), this.y + Math.sin(ang) * (this.radius + len), 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-}
-class Arrow {
-  constructor(x, y, vx, vy, damage, ownerId) {
-    this.x = x; this.y = y; this.vx = vx; this.vy = vy;
-    this.damage = damage || 6; this.ownerId = ownerId; this.radius = 3;
-    this.spawnedAt = now(); this.isAlive = true;
-  }
-  integrate(dt) {
-    this.vy += (GRAVITY || 0) * dt;
-    this.x += this.vx * dt; this.y += this.vy * dt;
-    if (this.x < -50 || this.x > canvas.width + 50 || this.y < -50 || this.y > canvas.height + 50) this.isAlive = false;
-  }
-  render(ctx) {
-    ctx.save();
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-}
-class Fireball {
-  constructor(x, y, vx, vy, damage, radius, ownerId) {
-    this.x = x; this.y = y; this.vx = vx; this.vy = vy;
-    this.damage = damage || 8; this.radius = radius || 8;
-    this.spawnedAt = now(); this.ownerId = ownerId; this.isAlive = true;
-  }
-  integrate(dt) {
-    this.vy += (GRAVITY || 0) * dt;
-    this.x += this.vx * dt; this.y += this.vy * dt;
-    if (this.x < -100 || this.x > canvas.width + 100 || this.y < -100 || this.y > canvas.height + 100) this.isAlive = false;
-  }
-  render(ctx) {
-    ctx.save();
-    ctx.fillStyle = '#ff7b00';
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-}
-class ExplosionEffect {
-  constructor(x, y, start, maxRadius, color) {
-    this.x = x; this.y = y; this.start = start || now();
-    this.maxRadius = maxRadius || 30; this.color = color || '#ff7b00';
-  }
-  render(ctx, t) {
-    const dt = (t - this.start) / 400;
-    if (dt >= 1) return;
-    const r = this.maxRadius * dt;
-    ctx.save();
-    ctx.globalAlpha = 1 - dt;
-    ctx.fillStyle = this.color;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-}
-class Game {
-  constructor(opts = {}) {
-    this.players = []; this.spawnConfigs = opts.spawnConfigs || [];
-    this.lastTime = now(); this.running = true; this.deathEffects = [];
-    this.arrows = []; this.fireballs = []; this.explosionEffects = []; this.init();
-  }
-  init() {
-    this.players.length = 0;
-    const count = this.spawnConfigs.length || 2;
-    for (let i = 0; i < (this.spawnConfigs.length || 2); i++) {
-      const sc = this.spawnConfigs[i] || { x: (i + 1) / (count + 1), y: 0.5, weaponType: 'sword', color: '#fff', health: 250 };
-      const px = Math.floor((sc.x || 0.5) * canvas.width);
-      const py = Math.floor((sc.y || 0.5) * canvas.height);
-      const p = new Player({ x: px, y: py, color: sc.color || '#fff', health: sc.health || 250, weaponType: sc.weaponType || 'sword', id: i + 1 });
-      const def = (typeof WEAPON_TYPES !== 'undefined' ? WEAPON_TYPES[p.weaponType] : null);
-      if (def) {
-        p.weaponLength = def.baseRange || p.weaponLength;
-        p.weaponThickness = def.thickness || p.weaponThickness;
-        p.damage = def.baseDamage || p.damage;
-      }
-      this.players.push(p);
-    }
-    this.deathEffects.length = 0; this.arrows.length = 0; this.fireballs.length = 0; this.explosionEffects.length = 0;
-    const restartBtn = document.getElementById('restartButton');
-    if (restartBtn) {
-      restartBtn.hidden = true;
-      restartBtn.onclick = () => { this.init(); restartBtn.hidden = true; };
-    }
-    this.lastTime = now(); this.running = true; this.loop();
-  }
-  spawnArrow(x, y, vx, vy, damage, ownerId) {
-    const a = new Arrow(x, y, vx, vy, damage, ownerId); this.arrows.push(a);
-  }
-  spawnFireball(x, y, vx, vy, damage, radius, ownerId) {
-    const f = new Fireball(x, y, vx, vy, damage, radius, ownerId); this.fireballs.push(f);
-  }
-  addExplosion(x, y, maxRadius, color) { this.explosionEffects.push(new ExplosionEffect(x, y, now(), maxRadius, color)); }
-  handleWeaponInteractions() {
-    for (let i = 0; i < this.players.length; i++) {
-      const a = this.players[i]; if (!a.isAlive) continue;
-      const lenA = a.weaponLength;
-      const tipAx = a.x + Math.cos(a.weaponAngle) * (a.radius + lenA);
-      const tipAy = a.y + Math.sin(a.weaponAngle) * (a.radius + lenA);
-      for (let j = 0; j < this.players.length; j++) {
-        if (i === j) continue;
-        const b = this.players[j]; if (!b.isAlive) continue;
-        const d2 = dist2(tipAx, tipAy, b.x, b.y);
-        const hitRadius = (b.radius + (a.weaponThickness || 4)) * (b.radius + (a.weaponThickness || 4));
-        if (d2 <= hitRadius) {
-          const defA = (typeof WEAPON_TYPES !== 'undefined' ? WEAPON_TYPES[a.weaponType] : null);
-          const baseDamage = (defA && defA.baseDamage) ? defA.baseDamage : a.damage || 1;
-          b.health -= baseDamage; a.lastHitAt = now();
-          if (defA && typeof defA.buff === 'function') {
-            try { defA.buff(a); } catch (e) { console.warn('Weapon buff error', e); }
+        function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+        function randInRange(a, b) { return a + Math.random() * (b - a); }
+        function dist2(ax, ay, bx, by) { const dx = ax - bx; const dy = ay - by; return dx * dx + dy * dy; }
+
+        class Player {
+          constructor(opts = {}) {
+            this.x = (opts.x !== undefined) ? opts.x : canvas.width / 2;
+            this.y = (opts.y !== undefined) ? opts.y : canvas.height / 2;
+            this.vx = 0; this.vy = 0;
+            this.radius = opts.radius || 12;
+            this.color = opts.color || '#ffffff';
+            this.health = opts.health || (opts.hp || 250);
+            this.weaponType = opts.weaponType || 'sword';
+            this.weaponAngle = 0;
+            this.weaponAngularVelocity = 0;
+            this.weaponLength = (opts.weaponLength !== undefined) ? opts.weaponLength : (window.WEAPON_TYPES && window.WEAPON_TYPES[this.weaponType] ? window.WEAPON_TYPES[this.weaponType].baseRange : 50);
+            this.weaponThickness = (opts.weaponThickness !== undefined) ? opts.weaponThickness : (window.WEAPON_TYPES && window.WEAPON_TYPES[this.weaponType] ? window.WEAPON_TYPES[this.weaponType].thickness : 4);
+            this.damage = (window.WEAPON_TYPES && window.WEAPON_TYPES[this.weaponType] ? window.WEAPON_TYPES[this.weaponType].baseDamage : 1);
+            this.isAlive = true;
+            this.id = opts.id || Math.floor(Math.random() * 1e9);
+            this.arrowCount = opts.arrowCount || 1;
           }
-          const nx = (b.x - a.x) || 0.0001; const ny = (b.y - a.y) || 0.0001;
-          const nl = Math.hypot(nx, ny); const k = 0.06;
-          b.vx += (nx / nl) * k; b.vy += (ny / nl) * k;
-          if (b.health <= 0) {
-            b.isAlive = false; this.deathEffects.push({ x: b.x, y: b.y, start: now(), color: b.color }); a.health += 5;
+          integrate(dt) {
+            if (!this.isAlive) return;
+            if (typeof window.GRAVITY !== 'undefined') this.vy += window.GRAVITY * dt;
+            if (typeof window.MAX_PLAYER_SPEED !== 'undefined') {
+              const sp = Math.hypot(this.vx, this.vy);
+              if (sp > window.MAX_PLAYER_SPEED) {
+                const s = window.MAX_PLAYER_SPEED / sp;
+                this.vx *= s; this.vy *= s;
+              }
+            }
+            this.x += this.vx * dt; this.y += this.vy * dt;
+            if (window.MAP_TYPE === 'rectangle' || typeof window.MAP_TYPE === 'undefined') {
+              if (this.x < this.radius) { this.x = this.radius; this.vx = -this.vx * 0.6; }
+              if (this.x > canvas.width - this.radius) { this.x = canvas.width - this.radius; this.vx = -this.vx * 0.6; }
+              if (this.y < this.radius) { this.y = this.radius; this.vy = -this.vy * 0.6; }
+              if (this.y > canvas.height - this.radius) { this.y = canvas.height - this.radius; this.vy = -this.vy * 0.6; }
+            } else if (window.MAP_TYPE === 'plus') {
+              const halfW = canvas.width / 2; const halfH = canvas.height / 2;
+              const halfWalk = window.WALKWAY_WIDTH / 2;
+              if (Math.abs(this.x - halfW) > halfWalk && Math.abs(this.y - halfH) > halfWalk) {
+                const dx = Math.abs(this.x - halfW) - halfWalk;
+                const dy = Math.abs(this.y - halfH) - halfWalk;
+                if (dx > dy) {
+                  if (this.x < halfW) this.x = halfW - halfWalk;
+                  else this.x = halfW + halfWalk;
+                  this.vx = -this.vx * 0.6;
+                } else {
+                  if (this.y < halfH) this.y = halfH - halfWalk;
+                  else this.y = halfH + halfWalk;
+                  this.vy = -this.vy * 0.6;
+                }
+              }
+            }
+            this.weaponAngle += this.weaponAngularVelocity * dt;
+          }
+          render(ctx) {
+            ctx.save();
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fill();
+            const wt = window.WEAPON_TYPES && window.WEAPON_TYPES[this.weaponType] ? window.WEAPON_TYPES[this.weaponType] : null;
+            const len = this.weaponLength;
+            const ang = this.weaponAngle;
+            const sx = this.x + Math.cos(ang) * this.radius;
+            const sy = this.y + Math.sin(ang) * this.radius;
+            ctx.lineWidth = this.weaponThickness || (wt ? wt.thickness : 4);
+            ctx.strokeStyle = '#ddd';
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(this.x + Math.cos(ang) * (this.radius + len), this.y + Math.sin(ang) * (this.radius + len));
+            ctx.stroke();
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(this.x + Math.cos(ang) * (this.radius + len), this.y + Math.sin(ang) * (this.radius + len), 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
           }
         }
-      }
-    }
-  }
-  updateProjectiles(dt) {
-    for (let i = this.arrows.length - 1; i >= 0; i--) {
-      const a = this.arrows[i];
-      if (!a.isAlive) { this.arrows.splice(i, 1); continue; }
-      a.integrate(dt);
-      for (let j = 0; j < this.players.length; j++) {
-        const p = this.players[j]; if (!p.isAlive) continue; if (p.id === a.ownerId) continue;
-        const d2 = dist2(a.x, a.y, p.x, p.y);
-        if (d2 <= (p.radius + a.radius) * (p.radius + a.radius)) {
-          p.health -= a.damage; a.isAlive = false; this.deathEffects.push({ x: a.x, y: a.y, start: now(), color: '#fff' });
-          if (p.health <= 0) { p.isAlive = false; this.deathEffects.push({ x: p.x, y: p.y, start: now(), color: p.color }); }
+
+        class Arrow {
+          constructor(x, y, vx, vy, damage, ownerId) {
+            this.x = x; this.y = y; this.vx = vx; this.vy = vy;
+            this.damage = damage || 6; this.ownerId = ownerId; this.radius = 3;
+            this.spawnedAt = now(); this.isAlive = true;
+          }
+          integrate(dt) {
+            this.vy += (window.GRAVITY || 0) * dt;
+            this.x += this.vx * dt; this.y += this.vy * dt;
+            if (this.x < -50 || this.x > canvas.width + 50 || this.y < -50 || this.y > canvas.height + 50) this.isAlive = false;
+          }
+          render(ctx) {
+            ctx.save(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+          }
         }
-      }
-    }
-    for (let i = this.fireballs.length - 1; i >= 0; i--) {
-      const f = this.fireballs[i];
-      if (!f.isAlive) { this.fireballs.splice(i, 1); continue; }
-      f.integrate(dt);
-      for (let j = 0; j < this.players.length; j++) {
-        const p = this.players[j]; if (!p.isAlive) continue; if (p.id === f.ownerId) continue;
-        const d2 = dist2(f.x, f.y, p.x, p.y);
-        if (d2 <= (p.radius + f.radius) * (p.radius + f.radius)) {
-          p.health -= f.damage; f.isAlive = false; this.addExplosion(f.x, f.y, 30, '#ff8b3a');
-          if (p.health <= 0) { p.isAlive = false; this.deathEffects.push({ x: p.x, y: p.y, start: now(), color: p.color }); }
+
+        class Fireball {
+          constructor(x, y, vx, vy, damage, radius, ownerId) {
+            this.x = x; this.y = y; this.vx = vx; this.vy = vy;
+            this.damage = damage || 8; this.radius = radius || 8; this.spawnedAt = now(); this.ownerId = ownerId; this.isAlive = true;
+          }
+          integrate(dt) {
+            this.vy += (window.GRAVITY || 0) * dt;
+            this.x += this.vx * dt; this.y += this.vy * dt;
+            if (this.x < -100 || this.x > canvas.width + 100 || this.y < -100 || this.y > canvas.height + 100) this.isAlive = false;
+          }
+          render(ctx) {
+            ctx.save(); ctx.fillStyle = '#ff7b00'; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+          }
         }
-      }
-    }
-  }
-  updatePlayers(dt) {
-    for (let i = 0; i < this.players.length; i++) {
-      const p = this.players[i]; if (!p.isAlive) continue;
-      p.weaponAngularVelocity += randInRange(-0.0004, 0.0004);
-      p.weaponAngularVelocity = clamp(p.weaponAngularVelocity, -0.02, 0.02);
-      p.vx += randInRange(-0.0006, 0.0006); p.vy += randInRange(-0.0006, 0.0006);
-      p.integrate(dt);
-      const def = (typeof WEAPON_TYPES !== 'undefined' ? WEAPON_TYPES[p.weaponType] : null);
-      if (def && p.weaponType === 'bow') {
-        if (!p._lastArrowAt || now() - p._lastArrowAt > 800) {
-          p._lastArrowAt = now();
-          const ang = p.weaponAngle;
-          const speed = def.baseSpeed * 1000;
-          const vx = Math.cos(ang) * speed; const vy = Math.sin(ang) * speed;
-          const tipx = p.x + Math.cos(ang) * (p.radius + p.weaponLength);
-          const tipy = p.y + Math.sin(ang) * (p.radius + p.weaponLength);
-          const ad = def.baseArrowDamage || 6;
-          this.spawnArrow(tipx, tipy, vx, vy, ad, p.id);
+
+        class ExplosionEffect {
+          constructor(x, y, start, maxRadius, color) {
+            this.x = x; this.y = y; this.start = start || now(); this.maxRadius = maxRadius || 30; this.color = color || '#ff7b00';
+          }
+          render(ctx, t) {
+            const dt = (t - this.start) / 400;
+            if (dt >= 1) return;
+            const r = this.maxRadius * dt;
+            ctx.save(); ctx.globalAlpha = 1 - dt; ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+          }
         }
-      }
-      if (def && p.weaponType === 'staff') {
-        if (!p._lastFireballAt || now() - p._lastFireballAt > (def.fireballCooldown || 1200)) {
-          p._lastFireballAt = now();
-          const ang = p.weaponAngle;
-          const speed = (def.baseSpeed || 0.01) * 800;
-          const vx = Math.cos(ang) * speed; const vy = Math.sin(ang) * speed;
-          const tipx = p.x + Math.cos(ang) * (p.radius + 8);
-          const tipy = p.y + Math.sin(ang) * (p.radius + 8);
-          this.spawnFireball(tipx, tipy, vx, vy, def.fireballDamage || 8, def.fireballRadius || 10, p.id);
+
+        class Game {
+          constructor(opts = {}) {
+            this.players = []; this.spawnConfigs = opts.spawnConfigs || []; this.lastTime = now(); this.running = true;
+            this.deathEffects = []; this.arrows = []; this.fireballs = []; this.explosionEffects = []; this.init();
+          }
+          init() {
+            this.players.length = 0;
+            const count = this.spawnConfigs.length || 2;
+            for (let i = 0; i < (this.spawnConfigs.length || 2); i++) {
+              const sc = this.spawnConfigs[i] || { x: (i + 1) / (count + 1), y: 0.5, weaponType: 'sword', color: '#fff', health: 250 };
+              const px = Math.floor((sc.x || 0.5) * canvas.width);
+              const py = Math.floor((sc.y || 0.5) * canvas.height);
+              const p = new Player({ x: px, y: py, color: sc.color || '#fff', health: sc.health || 250, weaponType: sc.weaponType || 'sword', id: i + 1 });
+              const def = (typeof window.WEAPON_TYPES !== 'undefined' ? window.WEAPON_TYPES[p.weaponType] : null);
+              if (def) {
+                p.weaponLength = def.baseRange || p.weaponLength;
+                p.weaponThickness = def.thickness || p.weaponThickness;
+                p.damage = def.baseDamage || p.damage;
+              }
+              this.players.push(p);
+            }
+            this.deathEffects.length = 0; this.arrows.length = 0; this.fireballs.length = 0; this.explosionEffects.length = 0;
+            const restartBtn = document.getElementById('restartButton');
+            if (restartBtn) {
+              restartBtn.hidden = true;
+              restartBtn.onclick = () => { this.init(); restartBtn.hidden = true; };
+            }
+            this.lastTime = now(); this.running = true; this.loop();
+          }
+          spawnArrow(x, y, vx, vy, damage, ownerId) { this.arrows.push(new Arrow(x, y, vx, vy, damage, ownerId)); }
+          spawnFireball(x, y, vx, vy, damage, radius, ownerId) { this.fireballs.push(new Fireball(x, y, vx, vy, damage, radius, ownerId)); }
+          addExplosion(x, y, maxRadius, color) { this.explosionEffects.push(new ExplosionEffect(x, y, now(), maxRadius, color)); }
+
+          handleWeaponInteractions() {
+            for (let i = 0; i < this.players.length; i++) {
+              const a = this.players[i]; if (!a.isAlive) continue;
+              const lenA = a.weaponLength;
+              const tipAx = a.x + Math.cos(a.weaponAngle) * (a.radius + lenA);
+              const tipAy = a.y + Math.sin(a.weaponAngle) * (a.radius + lenA);
+              for (let j = 0; j < this.players.length; j++) {
+                if (i === j) continue;
+                const b = this.players[j]; if (!b.isAlive) continue;
+                const d2 = dist2(tipAx, tipAy, b.x, b.y);
+                const hitRadius = (b.radius + (a.weaponThickness || 4)) * (b.radius + (a.weaponThickness || 4));
+                if (d2 <= hitRadius) {
+                  const defA = (typeof window.WEAPON_TYPES !== 'undefined' ? window.WEAPON_TYPES[a.weaponType] : null);
+                  const baseDamage = (defA && defA.baseDamage) ? defA.baseDamage : a.damage || 1;
+                  b.health -= baseDamage; a.lastHitAt = now();
+                  if (defA && typeof defA.buff === 'function') { try { defA.buff(a); } catch (e) { console.warn('Weapon buff error', e); } }
+                  const nx = (b.x - a.x) || 0.0001; const ny = (b.y - a.y) || 0.0001;
+                  const nl = Math.hypot(nx, ny); const k = 0.06;
+                  b.vx += (nx / nl) * k; b.vy += (ny / nl) * k;
+                  if (b.health <= 0) { b.isAlive = false; this.deathEffects.push({ x: b.x, y: b.y, start: now(), color: b.color }); a.health += 5; }
+                }
+              }
+            }
+          }
+
+          updateProjectiles(dt) {
+            for (let i = this.arrows.length - 1; i >= 0; i--) {
+              const a = this.arrows[i];
+              if (!a.isAlive) { this.arrows.splice(i, 1); continue; }
+              a.integrate(dt);
+              for (let j = 0; j < this.players.length; j++) {
+                const p = this.players[j]; if (!p.isAlive) continue; if (p.id === a.ownerId) continue;
+                const d2 = dist2(a.x, a.y, p.x, p.y);
+                if (d2 <= (p.radius + a.radius) * (p.radius + a.radius)) {
+                  p.health -= a.damage; a.isAlive = false; this.deathEffects.push({ x: a.x, y: a.y, start: now(), color: '#fff' });
+                  if (p.health <= 0) { p.isAlive = false; this.deathEffects.push({ x: p.x, y: p.y, start: now(), color: p.color }); }
+                }
+              }
+            }
+
+            for (let i = this.fireballs.length - 1; i >= 0; i--) {
+              const f = this.fireballs[i];
+              if (!f.isAlive) { this.fireballs.splice(i, 1); continue; }
+              f.integrate(dt);
+              for (let j = 0; j < this.players.length; j++) {
+                const p = this.players[j]; if (!p.isAlive) continue; if (p.id === f.ownerId) continue;
+                const d2 = dist2(f.x, f.y, p.x, p.y);
+                if (d2 <= (p.radius + f.radius) * (p.radius + f.radius)) {
+                  p.health -= f.damage; f.isAlive = false; this.addExplosion(f.x, f.y, 30, '#ff8b3a');
+                  if (p.health <= 0) { p.isAlive = false; this.deathEffects.push({ x: p.x, y: p.y, start: now(), color: p.color }); }
+                }
+              }
+            }
+          }
+
+          updatePlayers(dt) {
+            for (let i = 0; i < this.players.length; i++) {
+              const p = this.players[i]; if (!p.isAlive) continue;
+              p.weaponAngularVelocity += randInRange(-0.0004, 0.0004);
+              p.weaponAngularVelocity = clamp(p.weaponAngularVelocity, -0.02, 0.02);
+              p.vx += randInRange(-0.0006, 0.0006); p.vy += randInRange(-0.0006, 0.0006);
+              p.integrate(dt);
+              const def = (typeof window.WEAPON_TYPES !== 'undefined' ? window.WEAPON_TYPES[p.weaponType] : null);
+              if (def && p.weaponType === 'bow') {
+                if (!p._lastArrowAt || now() - p._lastArrowAt > 800) {
+                  p._lastArrowAt = now();
+                  const ang = p.weaponAngle;
+                  const speed = def.baseSpeed * 1000;
+                  const vx = Math.cos(ang) * speed; const vy = Math.sin(ang) * speed;
+                  const tipx = p.x + Math.cos(ang) * (p.radius + p.weaponLength);
+                  const tipy = p.y + Math.sin(ang) * (p.radius + p.weaponLength);
+                  const ad = def.baseArrowDamage || 6;
+                  this.spawnArrow(tipx, tipy, vx, vy, ad, p.id);
+                }
+              }
+              if (def && p.weaponType === 'staff') {
+                if (!p._lastFireballAt || now() - p._lastFireballAt > (def.fireballCooldown || 1200)) {
+                  p._lastFireballAt = now();
+                  const ang = p.weaponAngle;
+                  const speed = (def.baseSpeed || 0.01) * 800;
+                  const vx = Math.cos(ang) * speed; const vy = Math.sin(ang) * speed;
+                  const tipx = p.x + Math.cos(ang) * (p.radius + 8);
+                  const tipy = p.y + Math.sin(ang) * (p.radius + 8);
+                  this.spawnFireball(tipx, tipy, vx, vy, def.fireballDamage || 8, def.fireballRadius || 10, p.id);
+                }
+              }
+            }
+          }
+
+          renderBackground() {
+            ctx.save();
+            ctx.fillStyle = '#0b1220';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            if (window.MAP_TYPE === 'rectangle' || typeof window.MAP_TYPE === 'undefined') {
+              ctx.strokeStyle = 'rgba(255,255,255,0.02)'; ctx.lineWidth = 1;
+              const step = 40;
+              for (let x = 0; x < canvas.width; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
+              for (let y = 0; y < canvas.height; y += step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
+            } else if (window.MAP_TYPE === 'plus') {
+              const halfW = canvas.width / 2; const halfH = canvas.height / 2;
+              ctx.fillStyle = '#081520'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.fillStyle = '#061218'; const hw = window.WALKWAY_WIDTH || 200;
+              ctx.fillRect(0, halfH - hw / 2, canvas.width, hw); ctx.fillRect(halfW - hw / 2, 0, hw, canvas.height);
+            } else if (window.MAP_TYPE === 'box') {
+              ctx.fillStyle = '#061218'; const w = Math.min(canvas.width, canvas.height) * 0.4;
+              ctx.fillRect((canvas.width - w) / 2, (canvas.height - w) / 2, w, w);
+            } else if (window.MAP_TYPE === 'battlefield') {
+              ctx.fillStyle = '#061218';
+              for (let i = 0; i < 6; i++) {
+                const rx = randInRange(40, canvas.width - 100); const ry = randInRange(40, canvas.height - 100);
+                const rw = randInRange(30, 90); const rh = randInRange(30, 90);
+                ctx.fillRect(rx, ry, rw, rh);
+              }
+            }
+            ctx.restore();
+          }
+
+          renderScene(t) {
+            this.renderBackground();
+            for (let i = 0; i < this.players.length; i++) { const p = this.players[i]; if (!p.isAlive) continue; p.render(ctx); }
+            for (let i = 0; i < this.arrows.length; i++) this.arrows[i].render(ctx);
+            for (let i = 0; i < this.fireballs.length; i++) this.fireballs[i].render(ctx);
+            for (let i = 0; i < this.explosionEffects.length; i++) this.explosionEffects[i].render(ctx, t);
+            for (let i = 0; i < this.deathEffects.length; i++) {
+              const d = this.deathEffects[i]; const dt = (t - d.start) / 1000; if (dt > 1.2) continue;
+              ctx.save(); ctx.globalAlpha = 1 - dt; ctx.fillStyle = d.color || '#fff'; ctx.beginPath(); ctx.arc(d.x, d.y, 30 * dt, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+            }
+            this.renderHUD();
+          }
+
+          renderHUD() {
+            ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.45)'; roundRect(ctx, 8, 8, 160, 28, 6);
+            ctx.fillStyle = 'rgba(255,255,255,0.12)'; roundRect(ctx, 10, 10, 156, 24, 6);
+            ctx.fillStyle = '#fff'; ctx.font = '12px Arial';
+            ctx.fillText('Players: ' + this.players.filter(p => p.isAlive).length + ' / ' + this.players.length, 18, 26);
+            ctx.restore();
+          }
+
+          loop() {
+            if (!this.running) return;
+            const t = now(); const dt = Math.min(40, t - this.lastTime);
+            try { this.update(dt); } catch (e) { console.warn('Game update error', e); }
+            try { ctx.clearRect(0, 0, canvas.width, canvas.height); this.renderScene(t); } catch (e) { console.warn('Render error', e); }
+            this.lastTime = t;
+            this.deathEffects = this.deathEffects.filter(d => (t - d.start) < 2000);
+            window.requestAnimationFrame(() => this.loop());
+          }
+
+          update(dt) {
+            this.updatePlayers(dt); this.updateProjectiles(dt); this.handleWeaponInteractions();
+            for (let i = 0; i < this.players.length; i++) {
+              const p = this.players[i]; if (!p.isAlive && p._removed !== true) { p._removed = true; this.deathEffects.push({ x: p.x, y: p.y, start: now(), color: p.color }); }
+            }
+            this.arrows = this.arrows.filter(a => a.isAlive);
+            this.fireballs = this.fireballs.filter(f => f.isAlive);
+            this.explosionEffects = this.explosionEffects.filter(e => (now() - e.start) < 1000);
+          }
         }
-      }
-    }
-  }
-  renderBackground() {
-    ctx.save();
-    ctx.fillStyle = '#0b1220';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    if (MAP_TYPE === 'rectangle' || typeof MAP_TYPE === 'undefined') {
-      ctx.strokeStyle = 'rgba(255,255,255,0.02)'; ctx.lineWidth = 1;
-      const step = 40;
-      for (let x = 0; x < canvas.width; x += step) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
-      for (let y = 0; y < canvas.height; y += step) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
-    } else if (MAP_TYPE === 'plus') {
-      const halfW = canvas.width / 2; const halfH = canvas.height / 2;
-      ctx.fillStyle = '#081520'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#061218'; const hw = WALKWAY_WIDTH || 200;
-      ctx.fillRect(0, halfH - hw / 2, canvas.width, hw); ctx.fillRect(halfW - hw / 2, 0, hw, canvas.height);
-    } else if (MAP_TYPE === 'box') {
-      ctx.fillStyle = '#061218'; const w = Math.min(canvas.width, canvas.height) * 0.4;
-      ctx.fillRect((canvas.width - w) / 2, (canvas.height - w) / 2, w, w);
-    } else if (MAP_TYPE === 'battlefield') {
-      ctx.fillStyle = '#061218';
-      for (let i = 0; i < 6; i++) {
-        const rx = randInRange(40, canvas.width - 100); const ry = randInRange(40, canvas.height - 100);
-        const rw = randInRange(30, 90); const rh = randInRange(30, 90);
-        ctx.fillRect(rx, ry, rw, rh);
-      }
-    }
-    ctx.restore();
-  }
-  renderScene(t) {
-    this.renderBackground();
-    for (let i = 0; i < this.players.length; i++) {
-      const p = this.players[i]; if (!p.isAlive) continue; p.render(ctx);
-    }
-    for (let i = 0; i < this.arrows.length; i++) this.arrows[i].render(ctx);
-    for (let i = 0; i < this.fireballs.length; i++) this.fireballs[i].render(ctx);
-    for (let i = 0; i < this.explosionEffects.length; i++) this.explosionEffects[i].render(ctx, t);
-    for (let i = 0; i < this.deathEffects.length; i++) {
-      const d = this.deathEffects[i]; const dt = (t - d.start) / 1000; if (dt > 1.2) continue;
-      ctx.save(); ctx.globalAlpha = 1 - dt; ctx.fillStyle = d.color || '#fff'; ctx.beginPath();
-      ctx.arc(d.x, d.y, 30 * dt, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    }
-    this.renderHUD();
-  }
-  renderHUD() {
-    ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.45)'; roundRect(ctx, 8, 8, 160, 28, 6);
-    ctx.fillStyle = 'rgba(255,255,255,0.12)'; roundRect(ctx, 10, 10, 156, 24, 6);
-    ctx.fillStyle = '#fff'; ctx.font = '12px Arial';
-    ctx.fillText('Players: ' + this.players.filter(p => p.isAlive).length + ' / ' + this.players.length, 18, 26);
-    ctx.restore();
-  }
-  loop() {
-    if (!this.running) return;
-    const t = now(); const dt = Math.min(40, t - this.lastTime);
-    try { this.update(dt); } catch (e) { console.warn('Game update error', e); }
-    try { ctx.clearRect(0, 0, canvas.width, canvas.height); this.renderScene(t); } catch (e) { console.warn('Render error', e); }
-    this.lastTime = t;
-    this.deathEffects = this.deathEffects.filter(d => (t - d.start) < 2000);
-    window.requestAnimationFrame(() => this.loop());
-  }
-  update(dt) {
-    this.updatePlayers(dt); this.updateProjectiles(dt); this.handleWeaponInteractions();
-    for (let i = 0; i < this.players.length; i++) {
-      const p = this.players[i];
-      if (!p.isAlive && p._removed !== true) { p._removed = true; this.deathEffects.push({ x: p.x, y: p.y, start: now(), color: p.color }); }
-    }
-    this.arrows = this.arrows.filter(a => a.isAlive);
-    this.fireballs = this.fireballs.filter(f => f.isAlive);
-    this.explosionEffects = this.explosionEffects.filter(e => (now() - e.start) < 1000);
-  }
-}
-// Expose Game class globally
-try { if (typeof window !== 'undefined') window.Game = window.Game || Game; } catch (e) { console.warn('Failed to attach Game to window:', e); }
+
+        // expose Game to global scope
+        try { if (typeof window !== 'undefined') window.Game = window.Game || Game; } catch (e) { console.warn('Failed to attach Game to window:', e); }
+
+      })();
     </script>
 
-    <!-- ===== UI/menu script (uses global WEAPON_TYPES and Game) ===== -->
+    <!-- ===== UI/menu script（使用全局 WEAPON_TYPES 和 Game） ===== -->
     <script>
-      // 简单调试 banner
+      // small helper for temporary debug banners
       function showBanner(msg, timeout = 8000) {
         try {
           const el = document.createElement('div');
@@ -801,7 +782,7 @@ try { if (typeof window !== 'undefined') window.Game = window.Game || Game; } ca
           el.textContent = msg;
           document.body.appendChild(el);
           if (timeout > 0) setTimeout(() => el.remove(), timeout);
-        } catch (e) { console.warn(e); }
+        } catch (e) { console.warn('showBanner error', e); }
       }
 
       window.onerror = function(msg, url, line, col, err) {
@@ -852,27 +833,23 @@ try { if (typeof window !== 'undefined') window.Game = window.Game || Game; } ca
           console.warn('Failed to load weapon config', e);
         }
 
-        // snapshot defaults
+        // Capture default numeric snapshot
         const initialWeaponConfig = {};
         if (window.WEAPON_TYPES) {
           for (const type in window.WEAPON_TYPES) {
             initialWeaponConfig[type] = {};
             const def = window.WEAPON_TYPES[type];
-            for (const prop in def) {
-              if (typeof def[prop] === 'number') initialWeaponConfig[type][prop] = def[prop];
-            }
+            for (const prop in def) if (typeof def[prop] === 'number') initialWeaponConfig[type][prop] = def[prop];
           }
         }
 
         function updatePlayerConfigs() {
-          const defaultColors = (typeof DEFAULT_COLORS !== 'undefined' ? DEFAULT_COLORS : {});
+          const defaultColors = (typeof window.DEFAULT_COLORS !== 'undefined' ? window.DEFAULT_COLORS : {});
           const count = parseInt(playerCountSelect.value);
           playerConfigsDiv.innerHTML = '';
           for (let i = 0; i < count; i++) {
             const row = document.createElement('div');
-            row.style.display = 'flex';
-            row.style.alignItems = 'center';
-            row.style.marginBottom = '6px';
+            row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.marginBottom = '6px';
             row.innerHTML = `
               <span style="margin-right:8px;">Player ${i + 1}:</span>
               <label style="margin-right:4px;">Weapon
@@ -911,17 +888,15 @@ try { if (typeof window !== 'undefined') window.Game = window.Game || Game; } ca
         playerCountSelect.addEventListener('change', updatePlayerConfigs);
 
         plusSettings.style.display = mapTypeSelect.value === 'plus' ? 'block' : 'none';
-        mapTypeSelect.addEventListener('change', () => {
-          plusSettings.style.display = mapTypeSelect.value === 'plus' ? 'block' : 'none';
-        });
+        mapTypeSelect.addEventListener('change', () => { plusSettings.style.display = mapTypeSelect.value === 'plus' ? 'block' : 'none'; });
 
         startBtn.addEventListener('click', () => {
           const gravityVal = parseFloat(gravityInput.value);
-          if (!isNaN(gravityVal)) GRAVITY = gravityVal;
-          MAP_TYPE = mapTypeSelect.value;
-          if (MAP_TYPE === 'plus') {
+          if (!isNaN(gravityVal)) window.GRAVITY = gravityVal;
+          window.MAP_TYPE = mapTypeSelect.value;
+          if (window.MAP_TYPE === 'plus') {
             const wv = parseFloat(walkwayInput.value);
-            if (!isNaN(wv) && wv > 0) WALKWAY_WIDTH = wv;
+            if (!isNaN(wv) && wv > 0) window.WALKWAY_WIDTH = wv;
           }
           const cw = parseInt(canvasWidthInput.value);
           const ch = parseInt(canvasHeightInput.value);
@@ -947,12 +922,10 @@ try { if (typeof window !== 'undefined') window.Game = window.Game || Game; } ca
           canvasEl.style.display = '';
           scoreboard.style.display = '';
 
-          // Instantiate Game (Game is inlined and attached to window)
           try {
-            if (typeof Game === 'undefined' && typeof window.Game !== 'undefined') window.Game = window.Game;
             const GameCtor = window.Game || (typeof Game !== 'undefined' ? Game : null);
             if (!GameCtor) {
-              showBanner('Game constructor not found. Check console.', 8000);
+              showBanner('Game constructor not found. 请检查浏览器 Console 与 Network。', 8000);
               console.error('Game constructor not found.');
               return;
             }
@@ -968,11 +941,11 @@ try { if (typeof window !== 'undefined') window.Game = window.Game || Game; } ca
             }
           } catch (e) {
             console.error('Failed to instantiate Game:', e);
-            showBanner('Failed to instantiate Game. See console.', 8000);
+            showBanner('Failed to instantiate Game. See console for details.', 8000);
           }
         });
 
-        // weaponConfig modal
+        // weaponConfig modal (同之前逻辑)
         weaponConfigBtn.addEventListener('click', () => {
           weaponConfigModal.innerHTML = '';
           const wrapper = document.createElement('div');
