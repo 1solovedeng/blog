@@ -58,12 +58,12 @@
   configTitle: 'solove等的个人网站',
   title: 'solove等的个人网站',
   postAI: '',
-  pageFillDescription: 'Game Settings简单横幅提示调试用在全局作用域执行代码使用保持全局环境确保在全局作用域执行用拉取并脚本用于补救未正确加载的脚本关键如果返回通常是页面不要执行',
+  pageFillDescription: 'Game Settings简单横幅提示调试用在全局作用域执行代码使用保持全局环境用拉取并脚本用于补救未正确加载的脚本如果返回通常是页面不要执行',
   isPost: false,
   isHome: false,
   isHighlightShrink: false,
   isToc: false,
-  postUpdate: '2025-08-22 21:20:50',
+  postUpdate: '2025-08-22 21:32:37',
   postMainColor: '',
 }</script><noscript><style type="text/css">
   #nav {
@@ -282,7 +282,7 @@ if (true) {
     <script src="player.js"></script>
     <script src="game.js"></script>
 
-    <!-- Minimal 修复加载器（**仅在**脚本未定义关键全局时才会尝试补救） -->
+    <!-- Minimal 修复加载器（仅在关键全局缺失时尝试补救） -->
     <script>
       (function() {
         // 简单横幅提示（调试用）
@@ -307,7 +307,6 @@ if (true) {
 
         // 在全局作用域执行代码（使用 eval 保持全局环境）
         function evalGlobal(code) {
-          // (0, eval)(...) 确保在全局作用域执行
           return (0, eval)(code);
         }
 
@@ -317,7 +316,7 @@ if (true) {
             const res = await fetch(path, { cache: 'no-store' });
             if (!res.ok) throw new Error('Fetch failed: ' + res.status + ' ' + res.statusText);
             const text = await res.text();
-            // 关键：如果返回 HTML（通常是 404 页面），不要执行
+            // 如果返回 HTML（通常是 404 页面），不要执行
             if (text.trim().startsWith('<')) {
               throw new Error('Returned content looks like HTML (probably 404/redirect).');
             }
@@ -334,10 +333,8 @@ if (true) {
           const need = [];
           if (typeof WEAPON_TYPES === 'undefined') need.push('gameConfig.js');
           if (typeof Game === 'undefined' && typeof window.Game === 'undefined') need.push('game.js');
-          // If neither missing, nothing to do
           if (need.length === 0) return;
 
-          // 尝试逐个 fetch+eval 补救
           for (const p of need) {
             try {
               await fetchAndEval(p);
@@ -347,7 +344,6 @@ if (true) {
             }
           }
 
-          // 最后检查是否恢复
           if (typeof WEAPON_TYPES === 'undefined') {
             console.warn('WEAPON_TYPES 仍未定义。');
             showBanner('WEAPON_TYPES 未定义 — 请检查 gameConfig.js 是否正确部署。', 15000);
@@ -358,7 +354,6 @@ if (true) {
           }
         }
 
-        // 等 DOM 完全可用后运行检查（短延迟以让原有 <script> 有机会加载）
         document.addEventListener('DOMContentLoaded', function() {
           setTimeout(ensureGlobals, 80);
         });
