@@ -35,10 +35,10 @@ let height = canvas.height;
 const SOUNDS = {};
 (() => {
   try {
-    SOUNDS.hit = new Audio('assets/sounds/hit.mp3');
-    SOUNDS.ballbounce = new Audio('assets/sounds/ballbounce.mp3');
-    SOUNDS.swordsclash = new Audio('assets/sounds/swordsclash.mp3');
-    SOUNDS.arrow = new Audio('assets/sounds/arrow.mp3');
+    SOUNDS.hit = new Audio('/game/weaponballs/assets/sounds/hit.mp3');
+    SOUNDS.ballbounce = new Audio('/game/weaponballs/assets/sounds/ballbounce.mp3');
+    SOUNDS.swordsclash = new Audio('/game/weaponballs/assets/sounds/swordsclash.mp3');
+    SOUNDS.arrow = new Audio('/game/weaponballs/assets/sounds/arrow.mp3');
   } catch (e) {
     console.warn('Failed to load audio assets:', e);
   }
