@@ -1,26 +1,18 @@
 /*
  * Main game loop and logic.
- * (Modified: adds texture loading and sprite-based weapon/arrow rendering.
- *  Contains the full implementations of weapon interaction methods.)
+ * (Modified: adds texture loading and sprite-based weapon/arrow rendering,
+ *  and draws health numbers on the player circles.)
  */
 
 // Grab UI elements and canvas context up front so they are available
-// across the entire game lifecycle. These globals are also used by
-// Player.update (for width and height boundaries).
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const scoreboard = document.getElementById('scoreboard');
 const restartButton = document.getElementById('restartButton');
-// Use mutable width and height variables so they can reflect changes to
-// the canvas dimensions at runtime (e.g. from menu settings). These
-// variables are updated in Game.init().
 let width = canvas.width;
 let height = canvas.height;
 
-/*
- * -----------------------------------------------------------------------------
- * Sound loading and playback helpers
- */
+/* ------------------------- Sounds ------------------------- */
 const SOUNDS = {};
 (() => {
   try {
@@ -32,19 +24,15 @@ const SOUNDS = {};
     console.warn('Failed to load audio assets:', e);
   }
 })();
-
 function playSound(name, volume = 0.4) {
   const base = SOUNDS[name];
   if (!base) return;
   const inst = base.cloneNode();
   inst.volume = volume;
-  inst.play().catch(() => { /* suppress promise rejection if play fails */ });
+  inst.play().catch(() => {});
 }
 
-/**
- * Texture list: keys correspond to weaponType or usage.
- * Filenames are expected under /game/weaponballs/assets/textures/
- */
+/* ------------------------- Textures ------------------------- */
 const TEXTURE_FILES = {
   sword: 'sword.png',
   spear: 'spear.png',
@@ -64,14 +52,10 @@ class Game {
     this.arrows = [];
     this.fireballs = [];
     this.explosionEffects = [];
-    // will hold loaded Image objects map
     this.textures = {};
     this.init();
   }
 
-  /**
-   * Draw the map background and obstacles based on the selected map type.
-   */
   drawMapBackground() {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, width, height);
@@ -94,9 +78,6 @@ class Game {
     }
   }
 
-  /**
-   * Load textures used for weapons and arrows. Always resolves (never rejects).
-   */
   loadTextures() {
     const base = '/game/weaponballs/assets/textures/';
     const keys = Object.keys(TEXTURE_FILES);
@@ -134,11 +115,9 @@ class Game {
   }
 
   init() {
-    // Update width and height variables to match the current canvas size.
     width = canvas.width;
     height = canvas.height;
 
-    // set spawn configs (unchanged)
     let spawnConfigs;
     if (this.settings && Array.isArray(this.settings.spawnConfigs)) {
       spawnConfigs = this.settings.spawnConfigs;
@@ -156,9 +135,7 @@ class Game {
       const direction = index % 2 === 0 ? 1 : -1;
       let moveSpeed = 0.1;
       const def = (typeof WEAPON_TYPES !== 'undefined') ? WEAPON_TYPES[cfg.weaponType] : undefined;
-      if (def && typeof def.moveSpeed === 'number') {
-        moveSpeed = def.moveSpeed;
-      }
+      if (def && typeof def.moveSpeed === 'number') moveSpeed = def.moveSpeed;
       this.players.push(new Player({
         id: index,
         x: width * cfg.x,
@@ -210,7 +187,6 @@ class Game {
     this.obstacles = obs;
     window.OBSTACLES = obs;
 
-    // Load textures first then start loop (doesn't block if textures fail)
     this.loadTextures().then(() => {
       requestAnimationFrame(this.loop.bind(this));
     }).catch(() => {
@@ -228,37 +204,24 @@ class Game {
 
     const paused = timestamp < this.pauseUntil;
     if (!paused) {
-      for (const p of this.players) {
-        p.update(delta);
-      }
+      for (const p of this.players) p.update(delta);
       for (let i = 0; i < this.players.length; i++) {
         for (let j = i + 1; j < this.players.length; j++) {
           const p1 = this.players[i];
           const p2 = this.players[j];
-          if (circleCollision(p1, p2)) {
-            resolveBodyCollision(p1, p2);
-          }
+          if (circleCollision(p1, p2)) resolveBodyCollision(p1, p2);
         }
       }
       this.handleWeaponInteractions(timestamp);
       this.updateArrows(delta, timestamp);
-      if (typeof this.updateFireballs === 'function') {
-        this.updateFireballs(delta, timestamp);
-      }
-      if (typeof this.updatePoisonEffects === 'function') {
-        this.updatePoisonEffects(delta, timestamp);
-      }
+      if (typeof this.updateFireballs === 'function') this.updateFireballs(delta, timestamp);
+      if (typeof this.updatePoisonEffects === 'function') this.updatePoisonEffects(delta, timestamp);
     }
 
-    for (const p of this.players) {
-      p.draw(ctx);
-    }
-
+    for (const p of this.players) p.draw(ctx);
     this.drawDeathEffects(timestamp);
     this.drawArrows();
-    if (typeof this.drawFireballs === 'function') {
-      this.drawFireballs();
-    }
+    if (typeof this.drawFireballs === 'function') this.drawFireballs();
     this.updateScoreboard();
 
     const survivors = this.players.filter(p => p.health > 0);
@@ -313,7 +276,6 @@ class Game {
   }
 
   /* -------------------- weapon interactions & related methods -------------------- */
-
   handleWeaponInteractions(time) {
     const hitCooldown = 300;
 
@@ -321,7 +283,6 @@ class Game {
     for (let i = 0; i < this.players.length; i++) {
       const attacker = this.players[i];
       if (attacker.weaponType !== 'unarmed') continue;
-
       for (let j = 0; j < this.players.length; j++) {
         if (i === j) continue;
         const target = this.players[j];
@@ -349,6 +310,7 @@ class Game {
       }
     }
 
+    // Melee weapon hitting bodies
     for (let i = 0; i < this.players.length; i++) {
       const attacker = this.players[i];
       const tipA = attacker.getWeaponTip();
@@ -372,7 +334,6 @@ class Game {
     for (let i = 0; i < this.players.length; i++) {
       const p1 = this.players[i];
       if (p1.weaponType === 'unarmed') continue;
-
       const tip1 = p1.getWeaponTip();
       const start1 = p1.getWeaponBase();
       for (let j = i + 1; j < this.players.length; j++) {
@@ -383,9 +344,7 @@ class Game {
         if (!collides) {
           const distSq = segmentDistanceSquared(start1, tip1, start2, tip2);
           const threshold = (p1.weaponThickness / 2 + p2.weaponThickness / 2);
-          if (distSq < threshold * threshold / 10) {
-            collides = true;
-          }
+          if (distSq < threshold * threshold / 10) collides = true;
         }
         if (collides) {
           if (typeof playSound === 'function') playSound('swordsclash');
@@ -405,9 +364,7 @@ class Game {
               defender.damageDealt += attacker.damage;
               attacker.damageReceived += attacker.damage;
               const def = WEAPON_TYPES[defender.weaponType];
-              if (def && typeof def.buff === 'function') {
-                def.buff(defender);
-              }
+              if (def && typeof def.buff === 'function') def.buff(defender);
               const dxDef = attacker.x - defender.x;
               const dyDef = attacker.y - defender.y;
               const normDef = Math.hypot(dxDef, dyDef);
@@ -458,18 +415,14 @@ class Game {
     attacker.damageDealt += damage;
     target.damageReceived += damage;
     const def = WEAPON_TYPES[attacker.weaponType];
-    if (def && typeof def.buff === 'function') {
-      def.buff(attacker);
-    }
+    if (def && typeof def.buff === 'function') def.buff(attacker);
     const flashDuration = 50;
     target.flashColor = '#ff5555';
     target.flashUntil = time + flashDuration;
     this.pauseUntil = time + flashDuration;
     if (!attacker.lastHit) attacker.lastHit = {};
     attacker.lastHit[target.id] = time;
-    if (attacker.weaponType === 'scythe') {
-      this.applyPoisonStack(attacker, target);
-    }
+    if (attacker.weaponType === 'scythe') this.applyPoisonStack(attacker, target);
     if (typeof playSound === 'function') playSound('hit');
   }
 
@@ -511,9 +464,7 @@ class Game {
     for (const arrow of this.arrows) {
       arrow.x += arrow.vx * delta;
       arrow.y += arrow.vy * delta;
-      if (arrow.x < 0 || arrow.x > width || arrow.y < 0 || arrow.y > height) {
-        continue;
-      }
+      if (arrow.x < 0 || arrow.x > width || arrow.y < 0 || arrow.y > height) continue;
       const arrowThickness = 6;
       const arrowRadius = arrowThickness / 2;
       for (const target of this.players) {
@@ -531,9 +482,7 @@ class Game {
               target.damageDealt += arrow.damage;
               owner.damageReceived += arrow.damage;
               const def = WEAPON_TYPES[target.weaponType];
-              if (def && typeof def.buff === 'function') {
-                def.buff(target);
-              }
+              if (def && typeof def.buff === 'function') def.buff(target);
               const dx = owner.x - target.x;
               const dy = owner.y - target.y;
               const nrm = Math.hypot(dx, dy);
@@ -574,9 +523,7 @@ class Game {
           arrow.owner.damageDealt += arrow.damage;
           target.damageReceived += arrow.damage;
           const def = WEAPON_TYPES[arrow.owner.weaponType];
-          if (def && typeof def.buff === 'function') {
-            def.buff(arrow.owner);
-          }
+          if (def && typeof def.buff === 'function') def.buff(arrow.owner);
           const flashDuration = 80;
           target.flashColor = '#ff5555';
           target.flashUntil = time + flashDuration;
@@ -672,9 +619,7 @@ class Game {
     }
     if (hitSomeone) {
       const def = WEAPON_TYPES[owner.weaponType];
-      if (def && typeof def.buff === 'function') {
-        def.buff(owner);
-      }
+      if (def && typeof def.buff === 'function') def.buff(owner);
     }
     this.deathEffects.push({ x: fb.x, y: fb.y, color: '#ff8800', maxRadius: fb.radius, start: time });
   }
@@ -683,9 +628,7 @@ class Game {
     const dmg = owner.poisonDamage || 0;
     const dur = owner.poisonDuration || 0;
     if (dmg > 0 && dur > 0) {
-      if (!Array.isArray(target.poisonStacks)) {
-        target.poisonStacks = [];
-      }
+      if (!Array.isArray(target.poisonStacks)) target.poisonStacks = [];
       target.poisonStacks.push({ owner: owner, damage: dmg, remainingDamage: dmg, duration: dur, remainingTime: dur });
     }
   }
@@ -709,18 +652,12 @@ class Game {
         }
         stack.remainingDamage -= actual;
         stack.remainingTime -= delta;
-        if (stack.remainingDamage > 0 && stack.remainingTime > 0) {
-          remainingStacks.push(stack);
-        }
+        if (stack.remainingDamage > 0 && stack.remainingTime > 0) remainingStacks.push(stack);
       }
       target.poisonStacks = remainingStacks;
     }
   }
 
-  /**
-   * Draw all active arrows onto the canvas. If arrow texture is available,
-   * use it, otherwise fallback to rectangle fill.
-   */
   drawArrows() {
     const textures = window.WEAPON_TEXTURES || {};
     const arrowImg = textures['arrow'];
@@ -759,12 +696,8 @@ class Game {
     for (const p of this.players) {
       const def = WEAPON_TYPES[p.weaponType];
       let line = `${def.name} | Health: ${Math.max(0, Math.round(p.health))}`;
-      if (p.weaponType !== 'dummy') {
-        line += ` | Damage: ${p.damage.toFixed(1)}`;
-      }
-      if (p.weaponType !== 'dummy' && p.weaponType !== 'unarmed')  {
-        line += ` | Range: ${p.weaponLength.toFixed(0)}`;
-      }
+      if (p.weaponType !== 'dummy') line += ` | Damage: ${p.damage.toFixed(1)}`;
+      if (p.weaponType !== 'dummy' && p.weaponType !== 'unarmed') line += ` | Range: ${p.weaponLength.toFixed(0)}`;
       if (p.weaponType === 'dummy' && p.weaponType !== 'unarmed') {
         const mspd = def.moveSpeed !== undefined ? def.moveSpeed : 0;
         line += ` | Move: ${mspd.toFixed(2)}`;
@@ -780,9 +713,7 @@ class Game {
         const count = p.arrowCount !== undefined ? p.arrowCount : 1;
         line += ` | Arrows: ${count}`;
       }
-      if (p.weaponType === 'shield') {
-        line += ` | Width: ${Math.round(p.weaponThickness)}`;
-      }
+      if (p.weaponType === 'shield') line += ` | Width: ${Math.round(p.weaponThickness)}`;
       if (p.weaponType === 'staff') {
         const fd = p.fireballDamage !== undefined ? p.fireballDamage.toFixed(1) : '0';
         const fr = p.fireballRadius !== undefined ? p.fireballRadius.toFixed(0) : '0';
@@ -801,8 +732,7 @@ class Game {
 
   showGameOver(winner) {
     const players = this.players;
-    let maxDealt = 0;
-    let maxTaken = 0;
+    let maxDealt = 0, maxTaken = 0;
     for (const p of players) {
       if (p.damageDealt > maxDealt) maxDealt = p.damageDealt;
       if (p.damageReceived > maxTaken) maxTaken = p.damageReceived;
@@ -812,121 +742,62 @@ class Game {
       overlay = document.createElement('div');
       overlay.id = 'dynamicResultsOverlay';
       Object.assign(overlay.style, {
-        position: 'absolute',
-        top: '0',
-        left: '0',
-        right: '0',
-        bottom: '0',
-        background: 'rgba(0,0,0,0.8)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: '2000'
+        position: 'absolute', top: '0', left: '0', right: '0', bottom: '0',
+        background: 'rgba(0,0,0,0.8)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', zIndex: '2000'
       });
       document.body.appendChild(overlay);
     }
     const panel = document.createElement('div');
     Object.assign(panel.style, {
-      background: '#ffffff',
-      color: '#000000',
-      padding: '20px 30px',
-      borderRadius: '8px',
-      maxWidth: '90%',
-      maxHeight: '90%',
-      overflowY: 'auto',
-      textAlign: 'center'
+      background: '#ffffff', color: '#000000', padding: '20px 30px',
+      borderRadius: '8px', maxWidth: '90%', maxHeight: '90%', overflowY: 'auto', textAlign: 'center'
     });
-    const header = document.createElement('h2');
-    header.textContent = 'Game Over';
-    panel.appendChild(header);
+    const header = document.createElement('h2'); header.textContent = 'Game Over'; panel.appendChild(header);
     const winnerMsg = document.createElement('p');
-    if (winner) {
-      winnerMsg.innerHTML = `<strong style="color:${winner.color}">Player ${winner.id + 1} (${winner.weaponType}) wins!</strong>`;
-    } else {
-      winnerMsg.innerHTML = '<strong>Tie!</strong>';
-    }
+    if (winner) winnerMsg.innerHTML = `<strong style="color:${winner.color}">Player ${winner.id + 1} (${winner.weaponType}) wins!</strong>`;
+    else winnerMsg.innerHTML = '<strong>Tie!</strong>';
     panel.appendChild(winnerMsg);
+
     const table = document.createElement('table');
-    table.style.margin = '0 auto';
-    table.style.borderCollapse = 'collapse';
-    table.style.minWidth = '300px';
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
-    const columns = ['Player', 'Weapon', 'Health', 'Damage Dealt', 'Damage Taken'];
-    columns.forEach(col => {
-      const th = document.createElement('th');
-      th.textContent = col;
-      th.style.padding = '4px 8px';
-      th.style.borderBottom = '2px solid #000';
-      headerRow.appendChild(th);
+    table.style.margin = '0 auto'; table.style.borderCollapse = 'collapse'; table.style.minWidth = '300px';
+    const thead = document.createElement('thead'); const headerRow = document.createElement('tr');
+    ['Player', 'Weapon', 'Health', 'Damage Dealt', 'Damage Taken'].forEach(col => {
+      const th = document.createElement('th'); th.textContent = col; th.style.padding = '4px 8px'; th.style.borderBottom = '2px solid #000'; headerRow.appendChild(th);
     });
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
+    thead.appendChild(headerRow); table.appendChild(thead);
     const tbody = document.createElement('tbody');
     const sorted = players.slice().sort((a, b) => b.damageDealt - a.damageDealt);
     sorted.forEach(p => {
       const tr = document.createElement('tr');
-      const tdName = document.createElement('td');
-      tdName.style.color = p.color;
-      tdName.style.padding = '4px 8px';
-      tdName.textContent = `Player ${p.id + 1}`;
-      tr.appendChild(tdName);
-      const tdWeapon = document.createElement('td');
-      tdWeapon.style.padding = '4px 8px';
-      tdWeapon.textContent = p.weaponType;
-      tr.appendChild(tdWeapon);
-      const tdHealth = document.createElement('td');
-      tdHealth.style.padding = '4px 8px';
-      tdHealth.textContent = Math.max(0, Math.round(p.health));
-      tr.appendChild(tdHealth);
-      const tdDealt = document.createElement('td');
-      tdDealt.style.padding = '4px 8px';
-      tdDealt.textContent = Math.round(p.damageDealt);
-      if (p.damageDealt === maxDealt && maxDealt > 0) {
-        tdDealt.style.fontWeight = 'bold';
-        tdDealt.style.backgroundColor = '#d0ffd0';
-      }
+      const tdName = document.createElement('td'); tdName.style.color = p.color; tdName.style.padding = '4px 8px'; tdName.textContent = `Player ${p.id + 1}`; tr.appendChild(tdName);
+      const tdWeapon = document.createElement('td'); tdWeapon.style.padding = '4px 8px'; tdWeapon.textContent = p.weaponType; tr.appendChild(tdWeapon);
+      const tdHealth = document.createElement('td'); tdHealth.style.padding = '4px 8px'; tdHealth.textContent = Math.max(0, Math.round(p.health)); tr.appendChild(tdHealth);
+      const tdDealt = document.createElement('td'); tdDealt.style.padding = '4px 8px'; tdDealt.textContent = Math.round(p.damageDealt);
+      if (p.damageDealt === maxDealt && maxDealt > 0) { tdDealt.style.fontWeight = 'bold'; tdDealt.style.backgroundColor = '#d0ffd0'; }
       tr.appendChild(tdDealt);
-      const tdTaken = document.createElement('td');
-      tdTaken.style.padding = '4px 8px';
-      tdTaken.textContent = Math.round(p.damageReceived);
-      if (p.damageReceived === maxTaken && maxTaken > 0) {
-        tdTaken.style.fontWeight = 'bold';
-        tdTaken.style.backgroundColor = '#ffd0d0';
-      }
+      const tdTaken = document.createElement('td'); tdTaken.style.padding = '4px 8px'; tdTaken.textContent = Math.round(p.damageReceived);
+      if (p.damageReceived === maxTaken && maxTaken > 0) { tdTaken.style.fontWeight = 'bold'; tdTaken.style.backgroundColor = '#ffd0d0'; }
       tr.appendChild(tdTaken);
       tbody.appendChild(tr);
     });
-    table.appendChild(tbody);
-    panel.appendChild(table);
-    const note = document.createElement('p');
-    note.style.marginTop = '10px';
-    note.style.fontSize = '0.9em';
+    table.appendChild(tbody); panel.appendChild(table);
+    const note = document.createElement('p'); note.style.marginTop = '10px'; note.style.fontSize = '0.9em';
     note.innerHTML = '<span style="background:#d0ffd0;padding:2px 4px;">Most Dealt</span> <span style="background:#ffd0d0;padding:2px 4px;">Most Taken</span>';
     panel.appendChild(note);
-    const btn = restartButton;
-    btn.hidden = false;
-    if (btn.parentElement !== panel) {
-      panel.appendChild(btn);
-    }
+
+    const btn = restartButton; btn.hidden = false; if (btn.parentElement !== panel) panel.appendChild(btn);
     btn.onclick = () => {
       overlay.style.display = 'none';
-      if (window.currentSpawnConfigs) {
-        game = new Game({ spawnConfigs: window.currentSpawnConfigs });
-      } else {
-        game = new Game();
-      }
+      if (window.currentSpawnConfigs) game = new Game({ spawnConfigs: window.currentSpawnConfigs });
+      else game = new Game();
       btn.hidden = true;
     };
-    overlay.innerHTML = '';
-    overlay.appendChild(panel);
-    overlay.style.display = 'flex';
+    overlay.innerHTML = ''; overlay.appendChild(panel); overlay.style.display = 'flex';
   }
 }
 
-/**
- * Resolve collision between two players by exchanging velocities (elastic).
- */
+/* -------------------- Collision resolve -------------------- */
 function resolveBodyCollision(p1, p2) {
   const dx = p2.x - p1.x;
   const dy = p2.y - p1.y;
@@ -937,51 +808,34 @@ function resolveBodyCollision(p1, p2) {
   const nx = dx / dist;
   const ny = dy / dist;
   const separation = overlap / 2;
-  p1.x -= nx * separation;
-  p1.y -= ny * separation;
-  p2.x += nx * separation;
-  p2.y += ny * separation;
-  const kx = p1.vx - p2.vx;
-  const ky = p1.vy - p2.vy;
+  p1.x -= nx * separation; p1.y -= ny * separation;
+  p2.x += nx * separation; p2.y += ny * separation;
+  const kx = p1.vx - p2.vx; const ky = p1.vy - p2.vy;
   const dot = kx * nx + ky * ny;
   if (dot > 0) return;
   const damping = 0.2;
   const impulse = dot * damping;
-  p1.vx -= impulse * nx;
-  p1.vy -= impulse * ny;
-  p2.vx += impulse * nx;
-  p2.vy += impulse * ny;
-
+  p1.vx -= impulse * nx; p1.vy -= impulse * ny;
+  p2.vx += impulse * nx; p2.vy += impulse * ny;
   if (typeof MAX_PLAYER_SPEED !== 'undefined') {
     const s1 = Math.hypot(p1.vx, p1.vy);
-    if (s1 > MAX_PLAYER_SPEED) {
-      const scale1 = MAX_PLAYER_SPEED / s1;
-      p1.vx *= scale1;
-      p1.vy *= scale1;
-    }
+    if (s1 > MAX_PLAYER_SPEED) { const scale1 = MAX_PLAYER_SPEED / s1; p1.vx *= scale1; p1.vy *= scale1; }
     const s2 = Math.hypot(p2.vx, p2.vy);
-    if (s2 > MAX_PLAYER_SPEED) {
-      const scale2 = MAX_PLAYER_SPEED / s2;
-      p2.vx *= scale2;
-      p2.vy *= scale2;
-    }
+    if (s2 > MAX_PLAYER_SPEED) { const scale2 = MAX_PLAYER_SPEED / s2; p2.vx *= scale2; p2.vy *= scale2; }
   }
 }
 
-/* ===================== Texture-aware Player draw override ===================== */
-/* We override Player.prototype.draw so that weapons use textures sized to
-   weaponLength x weaponThickness when available. If Player is not yet
-   defined (shouldn't happen if player.js is loaded before this file),
-   we log a warning.
-*/
+/* -------------------- Override Player.draw to use textures and draw health -------------------- */
 function installPlayerDrawOverride() {
   if (typeof Player === 'undefined') {
-    console.warn('Player class not found - texture draw override skipped.');
+    console.warn('Player class not found - texture & health draw override skipped.');
     return;
   }
   Player.prototype.draw = function(ctx) {
     const now = performance.now();
     ctx.save();
+
+    // draw body circle (respect flash)
     const fillColor = (this.flashUntil && now < this.flashUntil && this.flashColor) ? this.flashColor : this.color;
     ctx.fillStyle = fillColor;
     ctx.beginPath();
@@ -989,6 +843,7 @@ function installPlayerDrawOverride() {
     ctx.fill();
     ctx.closePath();
 
+    // draw weapon as texture if available, otherwise as stroke
     try {
       const textures = window.WEAPON_TEXTURES || {};
       const base = (typeof this.getWeaponBase === 'function') ? this.getWeaponBase() : { x: this.x, y: this.y };
@@ -996,14 +851,13 @@ function installPlayerDrawOverride() {
       const angle = Math.atan2(tip.y - base.y, tip.x - base.x);
       const length = Math.hypot(tip.x - base.x, tip.y - base.y) || (this.weaponLength || 30);
       const thickness = this.weaponThickness || (WEAPON_TYPES && WEAPON_TYPES[this.weaponType] && WEAPON_TYPES[this.weaponType].thickness) || 6;
-
       const img = textures[this.weaponType];
+
       if (img && img.complete && img.naturalWidth) {
         ctx.translate(base.x, base.y);
         ctx.rotate(angle);
-        if (this.weaponFlashUntil && now < this.weaponFlashUntil) {
-          ctx.globalAlpha = 0.9;
-        }
+        if (this.weaponFlashUntil && now < this.weaponFlashUntil) ctx.globalAlpha = 0.9;
+        // draw image from base towards tip with size = weaponLength x weaponThickness
         ctx.drawImage(img, 0, -thickness / 2, length, thickness);
         ctx.globalAlpha = 1;
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1017,6 +871,7 @@ function installPlayerDrawOverride() {
         ctx.closePath();
       }
 
+      // shield fallback visual when no texture
       if (this.weaponType === 'shield' && !img) {
         ctx.fillStyle = this.color;
         const w = this.weaponThickness || 20;
@@ -1033,11 +888,29 @@ function installPlayerDrawOverride() {
       console.warn('Player draw error:', e);
     }
 
+    // draw health number centered on the player
+    try {
+      const hp = Math.max(0, Math.round(this.health || 0));
+      // font size proportional to radius (ensure minimum readable size)
+      const fontSize = Math.max(10, Math.floor(this.radius * 0.8));
+      ctx.font = `${fontSize}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      // stroke for contrast
+      ctx.lineWidth = Math.max(2, Math.floor(fontSize / 6));
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.strokeText(String(hp), this.x, this.y);
+      // fill text (white for visibility)
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(String(hp), this.x, this.y);
+    } catch (e) {
+      // don't break render on font issues
+      console.warn('Failed to draw health text:', e);
+    }
+
     ctx.restore();
   };
 }
-
-// install override now (if Player exists)
 installPlayerDrawOverride();
 
-/* ===================== End of game.js ===================== */
+/* End of file */
