@@ -58,12 +58,12 @@
   configTitle: 'solove等的个人网站',
   title: 'solove等的个人网站',
   postAI: '',
-  pageFillDescription: 'Game Settings友好提示横幅',
+  pageFillDescription: 'Game Settings显示友好横幅判断是否为响应',
   isPost: false,
   isHome: false,
   isHighlightShrink: false,
   isToc: false,
-  postUpdate: '2025-08-23 13:51:43',
+  postUpdate: '2025-08-23 14:09:57',
   postMainColor: '',
 }</script><noscript><style type="text/css">
   #nav {
@@ -222,7 +222,7 @@ if (true) {
       <button id="restartButton" hidden>Restart</button>
     </div>
 
-    <!-- Settings menu overlay (原样保留) -->
+    <!-- Settings menu overlay -->
     <div id="menu" style="position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:1000;">
       <h2 style="margin-bottom:10px;">Game Settings</h2>
       <div style="margin-bottom:10px;">
@@ -270,9 +270,9 @@ if (true) {
 
     <div id="weaponConfigModal" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.85); color:#fff; z-index:2000; overflow:auto;"></div>
 
-    <!-- Robust loader + 初始化（没有模板字符串，全部 DOM API） -->
+    <!-- 更稳健的 loader（包含：避免重复声明、检测 HTML 响应、更多候选路径、详细日志） -->
     <script>
-      // 友好提示横幅
+      // helper: 显示友好横幅
       function showBanner(msg, timeout) {
         timeout = typeof timeout === 'number' ? timeout : 8000;
         try {
@@ -289,21 +289,60 @@ if (true) {
           el.style.fontSize = '13px';
           el.textContent = msg;
           document.body.appendChild(el);
-          if (timeout > 0) setTimeout(function() { try { el.parentNode.removeChild(el); } catch(e){} }, timeout);
-        } catch (e) { console.warn(e); }
+          if (timeout > 0) setTimeout(function(){ try { el.parentNode.removeChild(el); } catch(e){} }, timeout);
+        } catch (e) {
+          console.warn('showBanner error', e);
+        }
       }
 
+      // 判断是否为 HTML 响应
       function looksLikeHTML(text) {
         if (!text) return false;
         var t = text.trim();
         return t.indexOf('<') === 0 || /<html/i.test(t.slice(0,100));
       }
 
+      // 判断脚本是否包含 top-level 声明（const/let/var/class/function）
+      function topLevelIdentifiers(text) {
+        var ids = {};
+        if (!text) return ids;
+        // var/let/const
+        var re = /(?:^|\s|;)(?:var|let|const)\s+([A-Za-z_$][\w$]*)/g;
+        var m;
+        while ((m = re.exec(text)) !== null) ids[m[1]] = true;
+        // function declarations
+        var re2 = /(?:^|\s)function\s+([A-Za-z_$][\w$]*)\s*\(/g;
+        while ((m = re2.exec(text)) !== null) ids[m[1]] = true;
+        // class declarations
+        var re3 = /(?:^|\s)class\s+([A-Za-z_$][\w$]*)\b/g;
+        while ((m = re3.exec(text)) !== null) ids[m[1]] = true;
+        return Object.keys(ids);
+      }
+
+      // 如果脚本声明的标识符已在 window 上存在，则跳过注入以避免重复声明错误
+      function shouldSkipBecauseAlreadyDeclared(text) {
+        var ids = topLevelIdentifiers(text);
+        if (!ids || ids.length === 0) return false;
+        for (var i = 0; i < ids.length; i++) {
+          var name = ids[i];
+          try {
+            if (typeof window !== 'undefined' && typeof window[name] !== 'undefined') {
+              // Found a clash (already exists)
+              console.warn('Detected top-level declaration "' + name + '" in script, and window.' + name + ' already exists; will skip injecting this script to avoid redeclaration.');
+              return true;
+            }
+          } catch (e) { /* ignore */ }
+        }
+        return false;
+      }
+
+      // 检测是否为 ES module（非常保守）
       function looksLikeModule(text) {
         if (!text) return false;
         return (/^\s*(import|export)\b/m).test(text) || (/\bexport\s+default\b/).test(text);
       }
 
+      // 注入脚本（通过 Blob），isModule 决定 type
       function injectScriptFromText(text, isModule) {
         return new Promise(function(resolve, reject) {
           try {
@@ -322,38 +361,44 @@ if (true) {
         });
       }
 
-      function candidatesFor(filename) {
-        var arr = [
-          filename,
-          './' + filename,
-          '/' + filename,
-          'js/' + filename,
-          './js/' + filename,
-          '/js/' + filename
-        ];
-        var seen = {};
-        var out = [];
-        for (var i = 0; i < arr.length; i++) {
-          if (!seen[arr[i]]) { seen[arr[i]] = true; out.push(arr[i]); }
-        }
-        return out;
-      }
-
+      // 尝试若干候选路径 fetch 并注入（含检测与跳过逻辑）
       function fetchAndInjectOne(name, candidates) {
         return new Promise(function(resolve) {
           (function tryNext(i) {
-            if (i >= candidates.length) { resolve(false); return; }
+            if (i >= candidates.length) { resolve({ ok:false, tried:candidates }); return; }
             var url = candidates[i];
             fetch(url, { cache: 'no-store' }).then(function(res) {
-              if (!res.ok) { console.warn('fetch', url, 'status', res.status); tryNext(i+1); return; }
+              if (!res.ok) {
+                console.warn('fetch', url, 'status', res.status);
+                tryNext(i+1);
+                return;
+              }
               res.text().then(function(text) {
-                if (looksLikeHTML(text)) { console.warn('fetch result looks like HTML for', url); tryNext(i+1); return; }
+                // 如果返回 HTML（index.html/404），不要执行
+                if (looksLikeHTML(text)) {
+                  console.warn('fetch result looks like HTML for', url);
+                  // 在 console 输出更多信息以便调试
+                  console.warn('First 200 chars:', text.slice(0,200).replace(/\n/g,' '));
+                  tryNext(i+1);
+                  return;
+                }
+                // 如果脚本会在顶部声明某些已存在的全局，跳过注入以避免重复声明
+                if (shouldSkipBecauseAlreadyDeclared(text)) {
+                  console.log('Skipping injection for', url, 'because it declares globals that already exist on window.');
+                  resolve({ ok:true, skipped:true, url:url });
+                  return;
+                }
+                // 根据内容判断是否 module
                 var isModule = looksLikeModule(text);
+                // 注入
                 injectScriptFromText(text, isModule).then(function() {
                   console.log('Loaded', name, 'from', url, 'module?', !!isModule);
-                  resolve(true);
+                  resolve({ ok:true, url:url, module:isModule });
                 }).catch(function(e) {
-                  console.warn('inject failed for', url, e);
+                  // 如果注入时报错（例如 SyntaxError），把错误和前200字符打印出来
+                  console.error('injectScriptFromText failed for', url, e);
+                  console.error('Snippet:', text.slice(0,200));
+                  showBanner('Error: 注入脚本失败 (' + name + ')，检查控制台以获取细节。', 10000);
                   tryNext(i+1);
                 });
               }).catch(function(e) {
@@ -368,53 +413,73 @@ if (true) {
         });
       }
 
-      function loadRequiredScriptsInOrder(list) {
-        return new Promise(function(resolve) {
-          var failed = [];
-          (function next(i) {
-            if (i >= list.length) { resolve({ failed: failed }); return; }
-            var name = list[i];
-            fetchAndInjectOne(name, candidatesFor(name)).then(function(ok) {
-              if (!ok) {
-                failed.push(name);
-                console.error('Failed to load', name, 'from any candidate path.');
-                showBanner('Error: 无法加载 ' + name + '（请检查部署或路径）。', 12000);
-              }
-              setTimeout(function() { next(i+1); }, 8);
-            });
-          })(0);
-        });
+      function candidatesFor(filename) {
+        // 扩展候选以覆盖常见托管情形
+        var arr = [
+          filename,
+          './' + filename,
+          '/' + filename,
+          'js/' + filename,
+          './js/' + filename,
+          '/js/' + filename,
+          'static/' + filename,
+          'assets/' + filename,
+          'public/' + filename
+        ];
+        var seen = {};
+        var out = [];
+        for (var i=0;i<arr.length;i++){
+          if (!seen[arr[i]]) { seen[arr[i]] = true; out.push(arr[i]); }
+        }
+        return out;
       }
 
-      function tryDynamicImportIfNeeded() {
-        return new Promise(function(resolve) {
-          (function tryPaths(paths, idx) {
-            if (idx >= paths.length) { resolve(false); return; }
-            var p = paths[idx] + '?_=' + Date.now();
-            import(p).then(function(m) {
-              if (m && (m.default || m.Game)) {
-                window.Game = m.default || m.Game;
-                console.log('dynamic import succeeded from', paths[idx]);
-                resolve(true);
-                return;
-              }
-              if (typeof m === 'function' || typeof m === 'object') {
-                window.Game = m;
-                resolve(true);
-                return;
-              }
-              tryPaths(paths, idx+1);
-            }).catch(function(e) {
-              console.warn('dynamic import failed for', p, e);
-              tryPaths(paths, idx+1);
-            });
-          })(candidatesFor('game.js'), 0);
-        });
+      // 顺序加载
+      async function loadRequiredScriptsInOrder(list) {
+        var failed = [];
+        for (var i=0;i<list.length;i++) {
+          var name = list[i];
+          var res = await fetchAndInjectOne(name, candidatesFor(name));
+          if (!res.ok) {
+            failed.push({name:name, tried:res.tried||[]});
+            console.error('Failed to load', name, 'tried:', res.tried||res.url||[]);
+            // 不立即中断，继续尝试加载后续脚本以便收集更多信息
+          } else {
+            // 如果注入成功但不是 module，并且脚本意图导出 Game/WEAPON_TYPES 等常量，
+            // 它们应该已挂到全局。若 module 且没有挂全局，我们稍后尝试 dynamic import。
+          }
+        }
+        return { failed: failed };
       }
 
-      // UI 绑定：全部用 DOM API 构建动态部分，避免模板字符串
+      // 尝试 dynamic import 补救（若 game.js 为 ESM 且没有把 Game 挂到 window）
+      async function tryDynamicImportIfNeeded() {
+        if (typeof Game !== 'undefined' || typeof window.Game !== 'undefined') return true;
+        var paths = candidatesFor('game.js');
+        for (var i=0;i<paths.length;i++) {
+          var p = paths[i] + '?_=' + Date.now();
+          try {
+            var m = await import(p);
+            if (m && (m.default || m.Game)) {
+              window.Game = m.default || m.Game;
+              console.log('Dynamic import succeeded from', paths[i]);
+              return true;
+            }
+            if (typeof m === 'function' || typeof m === 'object') {
+              window.Game = m;
+              return true;
+            }
+          } catch (e) {
+            console.warn('dynamic import failed for', p, e);
+          }
+        }
+        return false;
+      }
+
+      // 绑定 UI（保持原逻辑）
       function bindUI() {
         (function() {
+          /* 这部分与原 index.html 中 DOMContentLoaded 的实现保持一致（为简洁我复用你原来的逻辑） */
           var menu = document.getElementById('menu');
           var playerCountSelect = document.getElementById('playerCount');
           var playerConfigsDiv = document.getElementById('playerConfigs');
@@ -453,6 +518,7 @@ if (true) {
             }
           } catch (e) { console.warn('Failed to load weapon config', e); }
 
+          // snapshot defaults
           var initialWeaponConfig = {};
           if (typeof WEAPON_TYPES !== 'undefined') {
             for (var t in WEAPON_TYPES) {
@@ -513,7 +579,6 @@ if (true) {
             labelHP.appendChild(hpInput);
             row.appendChild(labelHP);
 
-            // default color based on DEFAULT_COLORS if present
             if (typeof DEFAULT_COLORS !== 'undefined') {
               var initType = select.value;
               if (DEFAULT_COLORS[initType]) colorInput.value = DEFAULT_COLORS[initType];
@@ -521,7 +586,6 @@ if (true) {
             select.addEventListener('change', function() {
               var t = this.value;
               if (typeof DEFAULT_COLORS !== 'undefined' && DEFAULT_COLORS[t]) {
-                // find sibling color input
                 var siblingColor = this.parentNode.parentNode.querySelector('.colorInput');
                 if (siblingColor) siblingColor.value = DEFAULT_COLORS[t];
               }
@@ -597,7 +661,7 @@ if (true) {
             };
           });
 
-          // weapon modal: 用 DOM API 构建表单
+          // weapon modal 逻辑（保留）
           weaponConfigBtn.addEventListener('click', function() {
             weaponConfigModal.innerHTML = '';
             var wrapper = document.createElement('div');
@@ -718,7 +782,6 @@ if (true) {
             weaponConfigModal.style.display = 'block';
 
             cancelBtn.onclick = function() { weaponConfigModal.style.display = 'none'; };
-
             resetBtn.onclick = function() {
               try { localStorage.removeItem('weaponConfig'); } catch(e) { console.warn(e); }
               for (var t in initialWeaponConfig) {
@@ -737,7 +800,6 @@ if (true) {
               }
               alert('Weapon configurations have been reset to defaults.');
             };
-
             saveBtn.onclick = function() {
               var configs = {};
               var inputs = weaponConfigModal.querySelectorAll('input[data-weapon]');
@@ -760,41 +822,40 @@ if (true) {
             };
           });
         })();
-      }
+      } // end bindUI
 
-      // startApp: 检查并绑定 UI（需要 WEAPON_TYPES / Game 或 dynamic import 补救）
-      async function startApp() {
+      // startApp: load scripts -> dynamic import 补救 -> bindUI
+      (async function() {
+        var required = ['gameConfig.js', 'utils.js', 'player.js', 'game.js'];
+        var res = await loadRequiredScriptsInOrder(required);
+        if (res.failed && res.failed.length > 0) {
+          // 输出更详细信息以便你或我进一步排查
+          console.warn('Some files failed to load:', res.failed);
+          // 继续尝试 dynamic import 补救，然后再启动（如果可以）
+          var ok = await tryDynamicImportIfNeeded();
+          if (!ok) {
+            showBanner('Error: 有脚本无法加载或被服务器返回为 HTML。请在 DevTools → Network 检查 gameConfig.js/game.js 的响应。', 15000);
+            console.error('Files failed:', res.failed);
+            return;
+          }
+        }
+        // final check: Game/WEAPON_TYPES 可用则绑定 UI
         if (typeof WEAPON_TYPES === 'undefined') {
-          console.warn('WEAPON_TYPES is not defined after loading scripts.');
-          showBanner('Warning: WEAPON_TYPES 未定义 — 请检查 gameConfig.js 是否正确部署并可访问（Network）。', 8000);
+          console.warn('WEAPON_TYPES 未定义（加载后）。');
+          showBanner('Warning: WEAPON_TYPES 未定义 — 请检查 gameConfig.js 是否正确部署并可访问（Network）。', 10000);
         }
         if (typeof Game === 'undefined' && typeof window.Game === 'undefined') {
-          console.warn('Game is not defined after loading scripts; attempting dynamic import.');
-          var ok = await tryDynamicImportIfNeeded();
-          if (!ok && (typeof Game === 'undefined' && typeof window.Game === 'undefined')) {
-            console.error('Game still not available after dynamic import.');
+          var di = await tryDynamicImportIfNeeded();
+          if (!di) {
             showBanner('Error: Game 未加载。请检查 game.js 是否正确部署（Network）。', 10000);
             return;
           }
         }
         bindUI();
-      }
-
-      (async function() {
-        var required = ['gameConfig.js', 'utils.js', 'player.js', 'game.js'];
-        var res = await loadRequiredScriptsInOrder(required);
-        if (res.failed && res.failed.length > 0) {
-          console.warn('Some required scripts failed to load:', res.failed);
-          // 仍然尝试 startApp（会做 dynamic import 补救）
-          await startApp();
-          return;
-        }
-        await startApp();
       })();
     </script>
 
     <script>
-      // 显示运行时错误（兼容原版）
       window.onerror = function(msg, url, line, col, err) {
         try {
           var div = document.createElement('div');
