@@ -1,7 +1,7 @@
 /*
  * Main game loop and logic.
  * (Modified: adds texture loading and sprite-based weapon/arrow rendering.
- *  Only game.js changed per request.)
+ *  Contains the full implementations of weapon interaction methods.)
  */
 
 // Grab UI elements and canvas context up front so they are available
@@ -38,7 +38,7 @@ function playSound(name, volume = 0.4) {
   if (!base) return;
   const inst = base.cloneNode();
   inst.volume = volume;
-  inst.play().catch(() => {});
+  inst.play().catch(() => { /* suppress promise rejection if play fails */ });
 }
 
 /**
@@ -70,47 +70,8 @@ class Game {
   }
 
   /**
-   * Load textures used for weapons and arrows. Always resolves (never rejects),
-   * but logs any loading failures. Sets window.WEAPON_TEXTURES when done.
+   * Draw the map background and obstacles based on the selected map type.
    */
-  loadTextures() {
-    const base = '/game/weaponballs/assets/textures/';
-    const keys = Object.keys(TEXTURE_FILES);
-    if (keys.length === 0) {
-      window.WEAPON_TEXTURES = {};
-      return Promise.resolve();
-    }
-    const textures = {};
-    let remaining = keys.length;
-    return new Promise((resolve) => {
-      keys.forEach(key => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => {
-          textures[key] = img;
-          remaining--;
-          if (remaining === 0) {
-            this.textures = textures;
-            window.WEAPON_TEXTURES = textures;
-            resolve(textures);
-          }
-        };
-        img.onerror = (e) => {
-          console.warn('Failed to load texture for', key, 'from', base + TEXTURE_FILES[key], e);
-          // leave undefined for this key, but still count down
-          remaining--;
-          if (remaining === 0) {
-            this.textures = textures;
-            window.WEAPON_TEXTURES = textures;
-            resolve(textures);
-          }
-        };
-        // Cache-bust to avoid stale CDN/caching during development (safe)
-        img.src = base + TEXTURE_FILES[key] + '?_=' + Date.now();
-      });
-    });
-  }
-
   drawMapBackground() {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, width, height);
@@ -133,11 +94,51 @@ class Game {
     }
   }
 
+  /**
+   * Load textures used for weapons and arrows. Always resolves (never rejects).
+   */
+  loadTextures() {
+    const base = '/game/weaponballs/assets/textures/';
+    const keys = Object.keys(TEXTURE_FILES);
+    if (keys.length === 0) {
+      window.WEAPON_TEXTURES = {};
+      return Promise.resolve({});
+    }
+    const textures = {};
+    let remaining = keys.length;
+    return new Promise((resolve) => {
+      keys.forEach(key => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          textures[key] = img;
+          remaining--;
+          if (remaining === 0) {
+            this.textures = textures;
+            window.WEAPON_TEXTURES = textures;
+            resolve(textures);
+          }
+        };
+        img.onerror = (e) => {
+          console.warn('Failed to load texture for', key, 'from', base + TEXTURE_FILES[key], e);
+          remaining--;
+          if (remaining === 0) {
+            this.textures = textures;
+            window.WEAPON_TEXTURES = textures;
+            resolve(textures);
+          }
+        };
+        img.src = base + TEXTURE_FILES[key] + '?_=' + Date.now();
+      });
+    });
+  }
+
   init() {
     // Update width and height variables to match the current canvas size.
     width = canvas.width;
     height = canvas.height;
 
+    // set spawn configs (unchanged)
     let spawnConfigs;
     if (this.settings && Array.isArray(this.settings.spawnConfigs)) {
       spawnConfigs = this.settings.spawnConfigs;
@@ -149,6 +150,7 @@ class Game {
         { x: 0.75, y: 0.5, weaponType: 'sword', color: '#d46b15ff', health: 250 },
       ];
     }
+
     this.players = [];
     spawnConfigs.forEach((cfg, index) => {
       const direction = index % 2 === 0 ? 1 : -1;
@@ -170,6 +172,7 @@ class Game {
         weaponAngle: Math.random() * Math.PI * 2
       }));
     });
+
     this.running = true;
     restartButton.hidden = true;
     this.lastTimestamp = performance.now();
@@ -207,12 +210,10 @@ class Game {
     this.obstacles = obs;
     window.OBSTACLES = obs;
 
-    // Load textures first (non-blocking: always resolves), then start loop
+    // Load textures first then start loop (doesn't block if textures fail)
     this.loadTextures().then(() => {
-      // textures (some or all) are now available at window.WEAPON_TEXTURES
       requestAnimationFrame(this.loop.bind(this));
     }).catch(() => {
-      // fallback: start anyway
       requestAnimationFrame(this.loop.bind(this));
     });
   }
@@ -249,7 +250,6 @@ class Game {
       }
     }
 
-    // draw players (Player.prototype.draw was overridden below to use textures)
     for (const p of this.players) {
       p.draw(ctx);
     }
@@ -312,27 +312,410 @@ class Game {
     this.deathEffects = stillActive;
   }
 
-  // ... weapon interaction methods unchanged (omitted here for brevity in explanation) ...
-  // The rest of handleWeaponInteractions, applyDamage, updateArrows, updateFireballs,
-  // explodeFireball, applyPoisonStack, updatePoisonEffects are kept as in your original
-  // script (we did not change logic), only drawArrows was enhanced to use textures.
-  // To avoid repeating large unchanged blocks here, continue with unchanged code:
+  /* -------------------- weapon interactions & related methods -------------------- */
 
-  /**
-   * (Keep the weapon interaction, arrow/fireball logic identical to original.)
-   * For brevity in this file display we include the previously provided implementations
-   * unchanged below. (In your actual file, keep the full original implementations.)
-   */
+  handleWeaponInteractions(time) {
+    const hitCooldown = 300;
 
-  // --- Original methods (handleWeaponInteractions, applyDamage, updateArrows, updateFireballs, explodeFireball, applyPoisonStack, updatePoisonEffects) ---
-  // (Paste unchanged implementations here; in this edited file they remain identical
-  //  to the versions you provided earlier. For clarity they are included below.)
+    // Unarmed body collisions
+    for (let i = 0; i < this.players.length; i++) {
+      const attacker = this.players[i];
+      if (attacker.weaponType !== 'unarmed') continue;
 
-  // For brevity in this message, we re-insert your previous implementations for those
-  // methods exactly as you had them (no logic changes). Please ensure your file
-  // contains the same implementations you used previously.
+      for (let j = 0; j < this.players.length; j++) {
+        if (i === j) continue;
+        const target = this.players[j];
+        if (target.health > 0 && circleCollision(attacker, target)) {
+          const extraDamage = attacker.accelSpeed * 8;
+          attacker.damage += extraDamage;
+          attacker.accelSpeed /= 5;
+          const last = attacker.lastHit[target.id] || 0;
+          if (time - last > hitCooldown) {
+            const dx = attacker.x - target.x;
+            const dy = attacker.y - target.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist > 0) {
+              const nx = dx / dist;
+              const ny = dy / dist;
+              const knockbackStrength = 1;
+              attacker.vx += nx * knockbackStrength;
+              attacker.vy += ny * knockbackStrength;
+              target.vx -= nx * knockbackStrength;
+              target.vy -= ny * knockbackStrength;
+            }
+            this.applyDamage(attacker, target, attacker.damage, time);
+          }
+        }
+      }
+    }
 
-  // (Now the drawArrows and drawFireballs below are the only render methods touched.)
+    for (let i = 0; i < this.players.length; i++) {
+      const attacker = this.players[i];
+      const tipA = attacker.getWeaponTip();
+      const lineStartA = attacker.getWeaponBase();
+      for (let j = 0; j < this.players.length; j++) {
+        if (i === j) continue;
+        const target = this.players[j];
+        if (attacker.weaponType !== 'bow' && attacker.weaponType !== 'shield' && attacker.weaponType !== 'staff') {
+          const effectiveRadius = target.radius + attacker.weaponThickness / 2;
+          if (lineCircleCollision(lineStartA, tipA, { x: target.x, y: target.y }, effectiveRadius) && target.health > 0) {
+            const last = attacker.lastHit[target.id] || 0;
+            if (time - last > hitCooldown) {
+              this.applyDamage(attacker, target, attacker.damage, time);
+            }
+          }
+        }
+      }
+    }
+
+    // Weapon-to-weapon collisions
+    for (let i = 0; i < this.players.length; i++) {
+      const p1 = this.players[i];
+      if (p1.weaponType === 'unarmed') continue;
+
+      const tip1 = p1.getWeaponTip();
+      const start1 = p1.getWeaponBase();
+      for (let j = i + 1; j < this.players.length; j++) {
+        const p2 = this.players[j];
+        const tip2 = p2.getWeaponTip();
+        const start2 = p2.getWeaponBase();
+        let collides = segmentsIntersect(start1, tip1, start2, tip2);
+        if (!collides) {
+          const distSq = segmentDistanceSquared(start1, tip1, start2, tip2);
+          const threshold = (p1.weaponThickness / 2 + p2.weaponThickness / 2);
+          if (distSq < threshold * threshold / 10) {
+            collides = true;
+          }
+        }
+        if (collides) {
+          if (typeof playSound === 'function') playSound('swordsclash');
+          const parryFlashDuration = 50;
+          p1.weaponFlashUntil = Math.max(p1.weaponFlashUntil || 0, time + parryFlashDuration);
+          p2.weaponFlashUntil = Math.max(p2.weaponFlashUntil || 0, time + parryFlashDuration);
+
+          const isP1Shield = p1.weaponType === 'shield';
+          const isP2Shield = p2.weaponType === 'shield';
+          if (isP1Shield !== isP2Shield) {
+            const attacker = isP1Shield ? p2 : p1;
+            const defender = isP1Shield ? p1 : p2;
+            if (attacker.health > 0) {
+              attacker.health -= attacker.damage;
+              if (attacker.health < 0) attacker.health = 0;
+              if (typeof playSound === 'function') playSound('hit');
+              defender.damageDealt += attacker.damage;
+              attacker.damageReceived += attacker.damage;
+              const def = WEAPON_TYPES[defender.weaponType];
+              if (def && typeof def.buff === 'function') {
+                def.buff(defender);
+              }
+              const dxDef = attacker.x - defender.x;
+              const dyDef = attacker.y - defender.y;
+              const normDef = Math.hypot(dxDef, dyDef);
+              if (normDef > 0) {
+                const push = 1;
+                attacker.vx += (dxDef / normDef) * push;
+                attacker.vy += (dyDef / normDef) * push;
+                if (typeof MAX_PLAYER_SPEED !== 'undefined') {
+                  const spd = Math.hypot(attacker.vx, attacker.vy);
+                  if (spd > MAX_PLAYER_SPEED) {
+                    const scl = MAX_PLAYER_SPEED / spd;
+                    attacker.vx *= scl;
+                    attacker.vy *= scl;
+                  }
+                }
+              }
+              const flashDuration = 50;
+              attacker.flashColor = '#ff5555';
+              attacker.flashUntil = time + flashDuration;
+              this.pauseUntil = time + flashDuration;
+              if (!defender.lastHit) defender.lastHit = {};
+              defender.lastHit[attacker.id] = time;
+            }
+          }
+
+          p1.weaponAngularVelocity *= -1;
+          p2.weaponAngularVelocity *= -1;
+          const dx = tip2.x - tip1.x;
+          const dy = tip2.y - tip1.y;
+          const normal = Math.hypot(dx, dy);
+          if (normal > 0) {
+            const nx = dx / normal;
+            const ny = dy / normal;
+            const knock = 0.05;
+            p1.vx -= nx * knock;
+            p1.vy -= ny * knock;
+            p2.vx += nx * knock;
+            p2.vy += ny * knock;
+          }
+        }
+      }
+    }
+  }
+
+  applyDamage(attacker, target, damage, time) {
+    target.health -= damage;
+    if (target.health < 0) target.health = 0;
+    attacker.damageDealt += damage;
+    target.damageReceived += damage;
+    const def = WEAPON_TYPES[attacker.weaponType];
+    if (def && typeof def.buff === 'function') {
+      def.buff(attacker);
+    }
+    const flashDuration = 50;
+    target.flashColor = '#ff5555';
+    target.flashUntil = time + flashDuration;
+    this.pauseUntil = time + flashDuration;
+    if (!attacker.lastHit) attacker.lastHit = {};
+    attacker.lastHit[target.id] = time;
+    if (attacker.weaponType === 'scythe') {
+      this.applyPoisonStack(attacker, target);
+    }
+    if (typeof playSound === 'function') playSound('hit');
+  }
+
+  updateArrows(delta, time) {
+    for (const p of this.players) {
+      if (p.weaponType !== 'bow') continue;
+      if (p.arrowCooldown === undefined) p.arrowCooldown = 1000;
+      if (p.lastArrowShotTime === undefined) p.lastArrowShotTime = 0;
+      if (p.arrowCount === undefined) p.arrowCount = 1;
+      if (p.arrowsRemaining === undefined) p.arrowsRemaining = 0;
+      if (p.nextArrowTime === undefined) p.nextArrowTime = 0;
+      if (p.arrowsRemaining > 0) {
+        if (time >= p.nextArrowTime) {
+          const angle = p.weaponAngle;
+          const speed = 0.5;
+          const vx = Math.cos(angle) * speed;
+          const vy = Math.sin(angle) * speed;
+          const start = p.getWeaponTip();
+          this.arrows.push({ x: start.x, y: start.y, vx: vx, vy: vy, owner: p, damage: 1 });
+          if (typeof playSound === 'function') playSound('arrow');
+          p.arrowsRemaining -= 1;
+          if (p.arrowsRemaining > 0) {
+            const baseInterval = 200;
+            const interval = baseInterval / p.arrowCount;
+            p.nextArrowTime = time + interval;
+          }
+        }
+      } else {
+        if (time - p.lastArrowShotTime >= p.arrowCooldown) {
+          p.arrowsRemaining = p.arrowCount;
+          p.lastArrowShotTime = time;
+          p.nextArrowTime = time;
+        }
+      }
+    }
+
+    const remaining = [];
+    arrowLoop:
+    for (const arrow of this.arrows) {
+      arrow.x += arrow.vx * delta;
+      arrow.y += arrow.vy * delta;
+      if (arrow.x < 0 || arrow.x > width || arrow.y < 0 || arrow.y > height) {
+        continue;
+      }
+      const arrowThickness = 6;
+      const arrowRadius = arrowThickness / 2;
+      for (const target of this.players) {
+        if (target === arrow.owner) continue;
+        const segStart = target.getWeaponBase();
+        const segEnd = target.getWeaponTip();
+        const distSq = distancePointToSegmentSquared({ x: arrow.x, y: arrow.y }, segStart, segEnd);
+        const threshold = (target.weaponThickness / 2 + arrowRadius);
+        if (distSq <= threshold * threshold) {
+          if (target.weaponType === 'shield') {
+            const owner = arrow.owner;
+            if (owner && owner.health > 0) {
+              owner.health -= arrow.damage;
+              if (owner.health < 0) owner.health = 0;
+              target.damageDealt += arrow.damage;
+              owner.damageReceived += arrow.damage;
+              const def = WEAPON_TYPES[target.weaponType];
+              if (def && typeof def.buff === 'function') {
+                def.buff(target);
+              }
+              const dx = owner.x - target.x;
+              const dy = owner.y - target.y;
+              const nrm = Math.hypot(dx, dy);
+              if (nrm > 0) {
+                const push = 0.1;
+                owner.vx += (dx / nrm) * push;
+                owner.vy += (dy / nrm) * push;
+                if (typeof MAX_PLAYER_SPEED !== 'undefined') {
+                  const spd2 = Math.hypot(owner.vx, owner.vy);
+                  if (spd2 > MAX_PLAYER_SPEED) {
+                    const scl2 = MAX_PLAYER_SPEED / spd2;
+                    owner.vx *= scl2;
+                    owner.vy *= scl2;
+                  }
+                }
+              }
+              const flashDuration = 50;
+              owner.flashColor = '#ff5555';
+              owner.flashUntil = time + flashDuration;
+              this.pauseUntil = time + flashDuration;
+              if (!target.lastHit) target.lastHit = {};
+              target.lastHit[owner.id] = time;
+              if (typeof playSound === 'function') playSound('hit');
+            }
+          }
+          continue arrowLoop;
+        }
+      }
+
+      for (const target of this.players) {
+        if (target === arrow.owner) continue;
+        if (target.health <= 0) continue;
+        const dx = arrow.x - target.x;
+        const dy = arrow.y - target.y;
+        if (dx * dx + dy * dy <= target.radius * target.radius) {
+          target.health -= arrow.damage;
+          if (target.health < 0) target.health = 0;
+          arrow.owner.damageDealt += arrow.damage;
+          target.damageReceived += arrow.damage;
+          const def = WEAPON_TYPES[arrow.owner.weaponType];
+          if (def && typeof def.buff === 'function') {
+            def.buff(arrow.owner);
+          }
+          const flashDuration = 80;
+          target.flashColor = '#ff5555';
+          target.flashUntil = time + flashDuration;
+          if (typeof playSound === 'function') playSound('hit');
+          continue arrowLoop;
+        }
+      }
+      remaining.push(arrow);
+    }
+    this.arrows = remaining;
+  }
+
+  updateFireballs(delta, time) {
+    for (const p of this.players) {
+      if (p.weaponType !== 'staff') continue;
+      if (p.lastFireballTime === undefined) p.lastFireballTime = 0;
+      if (p.fireballCooldown === undefined) p.fireballCooldown = 1000;
+      if (p.fireballDamage === undefined) p.fireballDamage = 2;
+      if (p.fireballRadius === undefined) p.fireballRadius = 40;
+      if (time - p.lastFireballTime >= p.fireballCooldown) {
+        const angle = p.weaponAngle;
+        const speed = 0.4;
+        const vx = Math.cos(angle) * speed;
+        const vy = Math.sin(angle) * speed;
+        const start = p.getWeaponTip();
+        this.fireballs.push({ x: start.x, y: start.y, vx, vy, owner: p, damage: p.fireballDamage, radius: p.fireballRadius });
+        p.lastFireballTime = time;
+        if (typeof playSound === 'function') playSound('arrow');
+      }
+    }
+
+    const stillActive = [];
+    fireLoop: for (const fb of this.fireballs) {
+      fb.x += fb.vx * delta;
+      fb.y += fb.vy * delta;
+      if (fb.x < 0 || fb.x > width || fb.y < 0 || fb.y > height) {
+        this.explodeFireball(fb, time);
+        continue;
+      }
+      if (Array.isArray(this.obstacles)) {
+        for (const ob of this.obstacles) {
+          if (fb.x >= ob.x && fb.x <= ob.x + ob.w && fb.y >= ob.y && fb.y <= ob.y + ob.h) {
+            this.explodeFireball(fb, time);
+            continue fireLoop;
+          }
+        }
+      }
+      for (const target of this.players) {
+        if (target === fb.owner) continue;
+        const segStart = target.getWeaponBase();
+        const segEnd = target.getWeaponTip();
+        const distSq = distancePointToSegmentSquared({ x: fb.x, y: fb.y }, segStart, segEnd);
+        const threshold = (target.weaponThickness / 2 + 4);
+        if (distSq <= threshold * threshold) {
+          this.explodeFireball(fb, time);
+          continue fireLoop;
+        }
+      }
+      for (const target of this.players) {
+        if (target === fb.owner || target.health <= 0) continue;
+        const dx = fb.x - target.x;
+        const dy = fb.y - target.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist <= target.radius) {
+          this.explodeFireball(fb, time);
+          continue fireLoop;
+        }
+      }
+      stillActive.push(fb);
+    }
+    this.fireballs = stillActive;
+  }
+
+  explodeFireball(fb, time) {
+    let hitSomeone = false;
+    const owner = fb.owner;
+    const radiusSq = fb.radius * fb.radius;
+    for (const target of this.players) {
+      if (target === owner || target.health <= 0) continue;
+      const dx = target.x - fb.x;
+      const dy = target.y - fb.y;
+      if (dx * dx + dy * dy <= radiusSq) {
+        hitSomeone = true;
+        target.health -= fb.damage;
+        if (target.health < 0) target.health = 0;
+        owner.damageDealt += fb.damage;
+        target.damageReceived += fb.damage;
+        target.flashColor = '#ff8800';
+        const flashDuration = 80;
+        target.flashUntil = time + flashDuration;
+        if (typeof playSound === 'function') playSound('hit');
+      }
+    }
+    if (hitSomeone) {
+      const def = WEAPON_TYPES[owner.weaponType];
+      if (def && typeof def.buff === 'function') {
+        def.buff(owner);
+      }
+    }
+    this.deathEffects.push({ x: fb.x, y: fb.y, color: '#ff8800', maxRadius: fb.radius, start: time });
+  }
+
+  applyPoisonStack(owner, target) {
+    const dmg = owner.poisonDamage || 0;
+    const dur = owner.poisonDuration || 0;
+    if (dmg > 0 && dur > 0) {
+      if (!Array.isArray(target.poisonStacks)) {
+        target.poisonStacks = [];
+      }
+      target.poisonStacks.push({ owner: owner, damage: dmg, remainingDamage: dmg, duration: dur, remainingTime: dur });
+    }
+  }
+
+  updatePoisonEffects(delta, time) {
+    for (const target of this.players) {
+      if (!Array.isArray(target.poisonStacks) || target.poisonStacks.length === 0) continue;
+      const remainingStacks = [];
+      for (const stack of target.poisonStacks) {
+        const rate = stack.damage / stack.duration;
+        const dmg = rate * delta;
+        const actual = Math.min(dmg, stack.remainingDamage);
+        if (actual > 0 && target.health > 0) {
+          target.health -= actual;
+          if (target.health < 0) target.health = 0;
+          stack.owner.damageDealt += actual;
+          target.damageReceived += actual;
+          target.flashColor = '#800080';
+          const flashDuration = 50;
+          target.flashUntil = Math.max(target.flashUntil, time + flashDuration);
+        }
+        stack.remainingDamage -= actual;
+        stack.remainingTime -= delta;
+        if (stack.remainingDamage > 0 && stack.remainingTime > 0) {
+          remainingStacks.push(stack);
+        }
+      }
+      target.poisonStacks = remainingStacks;
+    }
+  }
 
   /**
    * Draw all active arrows onto the canvas. If arrow texture is available,
@@ -347,10 +730,8 @@ class Game {
       const angle = Math.atan2(arrow.vy, arrow.vx);
       ctx.rotate(angle);
       if (arrowImg && arrowImg.complete && arrowImg.naturalWidth) {
-        // Draw image with length ~ 20 and thickness ~ 6 scaled to image aspect ratio
         const length = 20;
         const thickness = 6;
-        // draw with base at center of image (so it looks natural)
         ctx.drawImage(arrowImg, -length / 2, -thickness / 2, length, thickness);
       } else {
         ctx.fillStyle = arrow.owner ? arrow.owner.color : '#000';
@@ -543,13 +924,63 @@ class Game {
   }
 }
 
-// ========== Rendering override for Player to use textures ==========
-// We assume Player is defined (player.js loaded before this file).
-if (typeof Player !== 'undefined') {
-  // Replace Player.prototype.draw with a texture-aware renderer.
+/**
+ * Resolve collision between two players by exchanging velocities (elastic).
+ */
+function resolveBodyCollision(p1, p2) {
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist === 0) return;
+  const overlap = p1.radius + p2.radius - dist;
+  if (overlap <= 0) return;
+  const nx = dx / dist;
+  const ny = dy / dist;
+  const separation = overlap / 2;
+  p1.x -= nx * separation;
+  p1.y -= ny * separation;
+  p2.x += nx * separation;
+  p2.y += ny * separation;
+  const kx = p1.vx - p2.vx;
+  const ky = p1.vy - p2.vy;
+  const dot = kx * nx + ky * ny;
+  if (dot > 0) return;
+  const damping = 0.2;
+  const impulse = dot * damping;
+  p1.vx -= impulse * nx;
+  p1.vy -= impulse * ny;
+  p2.vx += impulse * nx;
+  p2.vy += impulse * ny;
+
+  if (typeof MAX_PLAYER_SPEED !== 'undefined') {
+    const s1 = Math.hypot(p1.vx, p1.vy);
+    if (s1 > MAX_PLAYER_SPEED) {
+      const scale1 = MAX_PLAYER_SPEED / s1;
+      p1.vx *= scale1;
+      p1.vy *= scale1;
+    }
+    const s2 = Math.hypot(p2.vx, p2.vy);
+    if (s2 > MAX_PLAYER_SPEED) {
+      const scale2 = MAX_PLAYER_SPEED / s2;
+      p2.vx *= scale2;
+      p2.vy *= scale2;
+    }
+  }
+}
+
+/* ===================== Texture-aware Player draw override ===================== */
+/* We override Player.prototype.draw so that weapons use textures sized to
+   weaponLength x weaponThickness when available. If Player is not yet
+   defined (shouldn't happen if player.js is loaded before this file),
+   we log a warning.
+*/
+function installPlayerDrawOverride() {
+  if (typeof Player === 'undefined') {
+    console.warn('Player class not found - texture draw override skipped.');
+    return;
+  }
   Player.prototype.draw = function(ctx) {
     const now = performance.now();
-    // Draw player body
     ctx.save();
     const fillColor = (this.flashUntil && now < this.flashUntil && this.flashColor) ? this.flashColor : this.color;
     ctx.fillStyle = fillColor;
@@ -558,7 +989,6 @@ if (typeof Player !== 'undefined') {
     ctx.fill();
     ctx.closePath();
 
-    // Weapon rendering
     try {
       const textures = window.WEAPON_TEXTURES || {};
       const base = (typeof this.getWeaponBase === 'function') ? this.getWeaponBase() : { x: this.x, y: this.y };
@@ -571,16 +1001,13 @@ if (typeof Player !== 'undefined') {
       if (img && img.complete && img.naturalWidth) {
         ctx.translate(base.x, base.y);
         ctx.rotate(angle);
-        // Optional weapon flash effect: slightly increase alpha when flashing
         if (this.weaponFlashUntil && now < this.weaponFlashUntil) {
           ctx.globalAlpha = 0.9;
         }
-        // Draw image so its inner end aligns with the weapon base and extends forward
         ctx.drawImage(img, 0, -thickness / 2, length, thickness);
         ctx.globalAlpha = 1;
-        ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
       } else {
-        // fallback: draw shaft as line
         ctx.strokeStyle = this.color;
         ctx.lineWidth = thickness;
         ctx.beginPath();
@@ -590,9 +1017,7 @@ if (typeof Player !== 'undefined') {
         ctx.closePath();
       }
 
-      // Optionally draw shield as filled rectangle (if shield and no texture)
       if (this.weaponType === 'shield' && !img) {
-        // draw a semi-opaque rounded rectangle at base
         ctx.fillStyle = this.color;
         const w = this.weaponThickness || 20;
         const h = this.weaponLength || 40;
@@ -605,18 +1030,14 @@ if (typeof Player !== 'undefined') {
         ctx.globalAlpha = 1;
       }
     } catch (e) {
-      // rendering must not break the game loop
       console.warn('Player draw error:', e);
     }
 
     ctx.restore();
   };
-} else {
-  console.warn('Player class not found - texture draw override skipped.');
 }
 
-// Note: Keep the rest of the original non-render logic (collision, weapon interactions, etc.)
-// unchanged. If you had those functions below in your original file, ensure they remain here
-// exactly as before (we intentionally did not alter game logic).
-// =============================================================================
-// End of modified game.js
+// install override now (if Player exists)
+installPlayerDrawOverride();
+
+/* ===================== End of game.js ===================== */
