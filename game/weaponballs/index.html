@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"><title>solove等的个人网站 | solove等的个人网站</title><meta name="author" content="solovedeng"><meta name="copyright" content="solovedeng"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#f7f9fe"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-touch-fullscreen" content="yes"><meta name="apple-mobile-web-app-title" content="solove等的个人网站"><meta name="application-name" content="solove等的个人网站"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="#f7f9fe"><meta property="og:type" content="website"><meta property="og:title" content="solove等的个人网站"><meta property="og:url" content="http://solovedeng.top/game/weaponballs/index.html"><meta property="og:site_name" content="solove等的个人网站"><meta property="og:description" content="Rotating Weapons Arena                                     Restart                       Game Settings                Number o"><meta property="og:locale" content="zh-CN"><meta property="og:image" content="http://solovedeng.top/img/avatar.jpg"><meta property="article:author" content="solovedeng"><meta property="article:tag"><meta name="twitter:card" content="summary"><meta name="twitter:image" content="http://solovedeng.top/img/avatar.jpg"><meta name="description" content="Rotating Weapons Arena                                     Restart                       Game Settings                Number o"><link rel="shortcut icon" href="/img/favicon.ico"><link rel="canonical" href="http://solovedeng.top/game/weaponballs/"><link rel="preconnect" href="//cdn.cbd.int"/><meta name="google-site-verification" content="xxx"/><meta name="baidu-site-verification" content="code-xxx"/><meta name="msvalidate.01" content="xxx"/><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.cbd.int/node-snackbar@0.1.16/dist/snackbar.min.css" media="print" onload="this.media='all'"><link rel="stylesheet" href="https://cdn.cbd.int/@fancyapps/ui@5.0.28/dist/fancybox/fancybox.css" media="print" onload="this.media='all'"><script async="async" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3823707821972465"></script><script>(adsbygoogle = window.adsbygoogle || []).push({
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"><title>solove等的个人网站 | solove等的个人网站</title><meta name="author" content="solovedeng"><meta name="copyright" content="solovedeng"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#f7f9fe"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-touch-fullscreen" content="yes"><meta name="apple-mobile-web-app-title" content="solove等的个人网站"><meta name="application-name" content="solove等的个人网站"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="#f7f9fe"><meta property="og:type" content="website"><meta property="og:title" content="solove等的个人网站"><meta property="og:url" content="http://solovedeng.top/game/weaponballs/index.html"><meta property="og:site_name" content="solove等的个人网站"><meta property="og:description" content="Rotating Weapons Arena                                                                   Restart                       Game Se"><meta property="og:locale" content="zh-CN"><meta property="og:image" content="http://solovedeng.top/img/avatar.jpg"><meta property="article:author" content="solovedeng"><meta property="article:tag"><meta name="twitter:card" content="summary"><meta name="twitter:image" content="http://solovedeng.top/img/avatar.jpg"><meta name="description" content="Rotating Weapons Arena                                                                   Restart                       Game Se"><link rel="shortcut icon" href="/img/favicon.ico"><link rel="canonical" href="http://solovedeng.top/game/weaponballs/"><link rel="preconnect" href="//cdn.cbd.int"/><meta name="google-site-verification" content="xxx"/><meta name="baidu-site-verification" content="code-xxx"/><meta name="msvalidate.01" content="xxx"/><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://cdn.cbd.int/node-snackbar@0.1.16/dist/snackbar.min.css" media="print" onload="this.media='all'"><link rel="stylesheet" href="https://cdn.cbd.int/@fancyapps/ui@5.0.28/dist/fancybox/fancybox.css" media="print" onload="this.media='all'"><script async="async" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3823707821972465"></script><script>(adsbygoogle = window.adsbygoogle || []).push({
   google_ad_client: 'ca-pub-3823707821972465',
   enable_page_level_ads: 'true'
 });</script><script>const GLOBAL_CONFIG = {
@@ -58,12 +58,12 @@
   configTitle: 'solove等的个人网站',
   title: 'solove等的个人网站',
   postAI: '',
-  pageFillDescription: 'Game Settings显示友好横幅判断是否为响应',
+  pageFillDescription: 'Game Settings',
   isPost: false,
   isHome: false,
   isHighlightShrink: false,
   isToc: false,
-  postUpdate: '2025-08-23 14:09:57',
+  postUpdate: '2025-08-23 14:23:40',
   postMainColor: '',
 }</script><noscript><style type="text/css">
   #nav {
@@ -217,8 +217,13 @@ if (true) {
   </head>
   <body>
     <div id="container">
+      <!-- Canvas resized to 500x500 and centered via CSS -->
+      <!-- Default canvas size set to 400x400 for a compact arena. The user
+           can change this via the menu inputs. -->
       <canvas id="gameCanvas" width="400" height="400"></canvas>
-      <div id="scoreboard"></div>
+      <div id="scoreboard">
+        <!-- Scores and messages will be inserted here by the script -->
+      </div>
       <button id="restartButton" hidden>Restart</button>
     </div>
 
@@ -264,612 +269,415 @@ if (true) {
         <label for="gravityInput">Gravity:&nbsp;</label>
         <input id="gravityInput" type="number" step="0.0001" value="0.0001" style="width:80px;" />
       </div>
+      <!-- Button to open weapon configuration menu -->
       <button id="weaponConfigBtn" style="padding:6px 12px; background:#2196f3; color:white; border:none; cursor:pointer; margin-bottom:10px;">Configure Weapons</button>
       <button id="startGameBtn" style="padding:6px 12px; background:#4caf50; color:white; border:none; cursor:pointer;">Start Game</button>
     </div>
 
+    <!-- Weapon configuration modal -->
     <div id="weaponConfigModal" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.85); color:#fff; z-index:2000; overflow:auto;"></div>
+    <!-- Load configuration and game logic from modular files (绝对地址改为你仓库的 raw 链接) -->
+    <script src="https://raw.githubusercontent.com/1solovedeng/blog/main/game/weaponballs/gameConfig.js"></script>
+    <script src="https://raw.githubusercontent.com/1solovedeng/blog/main/game/weaponballs/utils.js"></script>
+    <script src="https://raw.githubusercontent.com/1solovedeng/blog/main/game/weaponballs/player.js"></script>
+    <script src="https://raw.githubusercontent.com/1solovedeng/blog/main/game/weaponballs/game.js"></script>
 
-    <!-- 更稳健的 loader（包含：避免重复声明、检测 HTML 响应、更多候选路径、详细日志） -->
     <script>
-      // helper: 显示友好横幅
-      function showBanner(msg, timeout) {
-        timeout = typeof timeout === 'number' ? timeout : 8000;
+      // Display any script errors visibly on the page for debugging
+      window.onerror = function(msg, url, line, col, err) {
+        const div = document.createElement('div');
+        div.style.position = 'fixed';
+        div.style.bottom = '10px';
+        div.style.left = '10px';
+        div.style.background = '#f44336';
+        div.style.color = '#fff';
+        div.style.padding = '4px 8px';
+        div.style.zIndex = 5000;
+        div.textContent = 'Error: ' + msg + ' at ' + line + ':' + col;
+        document.body.appendChild(div);
+      };
+
+      // Menu logic for customizing players and starting the game
+      document.addEventListener('DOMContentLoaded', () => {
+        const menu = document.getElementById('menu');
+        const playerCountSelect = document.getElementById('playerCount');
+        const playerConfigsDiv = document.getElementById('playerConfigs');
+        const gravityInput = document.getElementById('gravityInput');
+        const startBtn = document.getElementById('startGameBtn');
+        const weaponConfigBtn = document.getElementById('weaponConfigBtn');
+        const weaponConfigModal = document.getElementById('weaponConfigModal');
+        const canvas = document.getElementById('gameCanvas');
+        const scoreboard = document.getElementById('scoreboard');
+        const restartButton = document.getElementById('restartButton');
+
+        // Map and canvas controls
+        const mapTypeSelect = document.getElementById('mapType');
+        const plusSettings = document.getElementById('plusSettings');
+        const walkwayInput = document.getElementById('walkwayWidth');
+        const canvasWidthInput = document.getElementById('canvasWidth');
+        const canvasHeightInput = document.getElementById('canvasHeight');
+        // Hide the game area until start
+        canvas.style.display = 'none';
+        scoreboard.style.display = 'none';
+        restartButton.hidden = true;
+
+        // Load persisted weapon configuration from localStorage and apply
+        // custom values to the global WEAPON_TYPES object. If no
+        // configuration exists, nothing will be changed. The stored
+        // structure is an object keyed by weapon type with sub-objects
+        // mapping property names to numeric values.
         try {
-          var el = document.createElement('div');
-          el.style.position = 'fixed';
-          el.style.top = '10px';
-          el.style.left = '10px';
-          el.style.background = '#f44336';
-          el.style.color = '#fff';
-          el.style.padding = '6px 10px';
-          el.style.zIndex = 100000;
-          el.style.borderRadius = '6px';
-          el.style.fontFamily = 'Arial, sans-serif';
-          el.style.fontSize = '13px';
-          el.textContent = msg;
-          document.body.appendChild(el);
-          if (timeout > 0) setTimeout(function(){ try { el.parentNode.removeChild(el); } catch(e){} }, timeout);
-        } catch (e) {
-          console.warn('showBanner error', e);
-        }
-      }
-
-      // 判断是否为 HTML 响应
-      function looksLikeHTML(text) {
-        if (!text) return false;
-        var t = text.trim();
-        return t.indexOf('<') === 0 || /<html/i.test(t.slice(0,100));
-      }
-
-      // 判断脚本是否包含 top-level 声明（const/let/var/class/function）
-      function topLevelIdentifiers(text) {
-        var ids = {};
-        if (!text) return ids;
-        // var/let/const
-        var re = /(?:^|\s|;)(?:var|let|const)\s+([A-Za-z_$][\w$]*)/g;
-        var m;
-        while ((m = re.exec(text)) !== null) ids[m[1]] = true;
-        // function declarations
-        var re2 = /(?:^|\s)function\s+([A-Za-z_$][\w$]*)\s*\(/g;
-        while ((m = re2.exec(text)) !== null) ids[m[1]] = true;
-        // class declarations
-        var re3 = /(?:^|\s)class\s+([A-Za-z_$][\w$]*)\b/g;
-        while ((m = re3.exec(text)) !== null) ids[m[1]] = true;
-        return Object.keys(ids);
-      }
-
-      // 如果脚本声明的标识符已在 window 上存在，则跳过注入以避免重复声明错误
-      function shouldSkipBecauseAlreadyDeclared(text) {
-        var ids = topLevelIdentifiers(text);
-        if (!ids || ids.length === 0) return false;
-        for (var i = 0; i < ids.length; i++) {
-          var name = ids[i];
-          try {
-            if (typeof window !== 'undefined' && typeof window[name] !== 'undefined') {
-              // Found a clash (already exists)
-              console.warn('Detected top-level declaration "' + name + '" in script, and window.' + name + ' already exists; will skip injecting this script to avoid redeclaration.');
-              return true;
-            }
-          } catch (e) { /* ignore */ }
-        }
-        return false;
-      }
-
-      // 检测是否为 ES module（非常保守）
-      function looksLikeModule(text) {
-        if (!text) return false;
-        return (/^\s*(import|export)\b/m).test(text) || (/\bexport\s+default\b/).test(text);
-      }
-
-      // 注入脚本（通过 Blob），isModule 决定 type
-      function injectScriptFromText(text, isModule) {
-        return new Promise(function(resolve, reject) {
-          try {
-            var blob = new Blob([text], { type: 'text/javascript' });
-            var url = URL.createObjectURL(blob);
-            var s = document.createElement('script');
-            if (isModule) s.type = 'module';
-            s.src = url;
-            s.async = false;
-            s.onload = function() { URL.revokeObjectURL(url); resolve(); };
-            s.onerror = function(e) { URL.revokeObjectURL(url); reject(e); };
-            document.head.appendChild(s);
-          } catch (e) {
-            reject(e);
-          }
-        });
-      }
-
-      // 尝试若干候选路径 fetch 并注入（含检测与跳过逻辑）
-      function fetchAndInjectOne(name, candidates) {
-        return new Promise(function(resolve) {
-          (function tryNext(i) {
-            if (i >= candidates.length) { resolve({ ok:false, tried:candidates }); return; }
-            var url = candidates[i];
-            fetch(url, { cache: 'no-store' }).then(function(res) {
-              if (!res.ok) {
-                console.warn('fetch', url, 'status', res.status);
-                tryNext(i+1);
-                return;
-              }
-              res.text().then(function(text) {
-                // 如果返回 HTML（index.html/404），不要执行
-                if (looksLikeHTML(text)) {
-                  console.warn('fetch result looks like HTML for', url);
-                  // 在 console 输出更多信息以便调试
-                  console.warn('First 200 chars:', text.slice(0,200).replace(/\n/g,' '));
-                  tryNext(i+1);
-                  return;
-                }
-                // 如果脚本会在顶部声明某些已存在的全局，跳过注入以避免重复声明
-                if (shouldSkipBecauseAlreadyDeclared(text)) {
-                  console.log('Skipping injection for', url, 'because it declares globals that already exist on window.');
-                  resolve({ ok:true, skipped:true, url:url });
-                  return;
-                }
-                // 根据内容判断是否 module
-                var isModule = looksLikeModule(text);
-                // 注入
-                injectScriptFromText(text, isModule).then(function() {
-                  console.log('Loaded', name, 'from', url, 'module?', !!isModule);
-                  resolve({ ok:true, url:url, module:isModule });
-                }).catch(function(e) {
-                  // 如果注入时报错（例如 SyntaxError），把错误和前200字符打印出来
-                  console.error('injectScriptFromText failed for', url, e);
-                  console.error('Snippet:', text.slice(0,200));
-                  showBanner('Error: 注入脚本失败 (' + name + ')，检查控制台以获取细节。', 10000);
-                  tryNext(i+1);
-                });
-              }).catch(function(e) {
-                console.warn('read text failed for', url, e);
-                tryNext(i+1);
-              });
-            }).catch(function(e) {
-              console.warn('fetch error for', url, e);
-              tryNext(i+1);
-            });
-          })(0);
-        });
-      }
-
-      function candidatesFor(filename) {
-        // 扩展候选以覆盖常见托管情形
-        var arr = [
-          filename,
-          './' + filename,
-          '/' + filename,
-          'js/' + filename,
-          './js/' + filename,
-          '/js/' + filename,
-          'static/' + filename,
-          'assets/' + filename,
-          'public/' + filename
-        ];
-        var seen = {};
-        var out = [];
-        for (var i=0;i<arr.length;i++){
-          if (!seen[arr[i]]) { seen[arr[i]] = true; out.push(arr[i]); }
-        }
-        return out;
-      }
-
-      // 顺序加载
-      async function loadRequiredScriptsInOrder(list) {
-        var failed = [];
-        for (var i=0;i<list.length;i++) {
-          var name = list[i];
-          var res = await fetchAndInjectOne(name, candidatesFor(name));
-          if (!res.ok) {
-            failed.push({name:name, tried:res.tried||[]});
-            console.error('Failed to load', name, 'tried:', res.tried||res.url||[]);
-            // 不立即中断，继续尝试加载后续脚本以便收集更多信息
-          } else {
-            // 如果注入成功但不是 module，并且脚本意图导出 Game/WEAPON_TYPES 等常量，
-            // 它们应该已挂到全局。若 module 且没有挂全局，我们稍后尝试 dynamic import。
-          }
-        }
-        return { failed: failed };
-      }
-
-      // 尝试 dynamic import 补救（若 game.js 为 ESM 且没有把 Game 挂到 window）
-      async function tryDynamicImportIfNeeded() {
-        if (typeof Game !== 'undefined' || typeof window.Game !== 'undefined') return true;
-        var paths = candidatesFor('game.js');
-        for (var i=0;i<paths.length;i++) {
-          var p = paths[i] + '?_=' + Date.now();
-          try {
-            var m = await import(p);
-            if (m && (m.default || m.Game)) {
-              window.Game = m.default || m.Game;
-              console.log('Dynamic import succeeded from', paths[i]);
-              return true;
-            }
-            if (typeof m === 'function' || typeof m === 'object') {
-              window.Game = m;
-              return true;
-            }
-          } catch (e) {
-            console.warn('dynamic import failed for', p, e);
-          }
-        }
-        return false;
-      }
-
-      // 绑定 UI（保持原逻辑）
-      function bindUI() {
-        (function() {
-          /* 这部分与原 index.html 中 DOMContentLoaded 的实现保持一致（为简洁我复用你原来的逻辑） */
-          var menu = document.getElementById('menu');
-          var playerCountSelect = document.getElementById('playerCount');
-          var playerConfigsDiv = document.getElementById('playerConfigs');
-          var gravityInput = document.getElementById('gravityInput');
-          var startBtn = document.getElementById('startGameBtn');
-          var weaponConfigBtn = document.getElementById('weaponConfigBtn');
-          var weaponConfigModal = document.getElementById('weaponConfigModal');
-          var canvas = document.getElementById('gameCanvas');
-          var scoreboard = document.getElementById('scoreboard');
-          var restartButton = document.getElementById('restartButton');
-
-          var mapTypeSelect = document.getElementById('mapType');
-          var plusSettings = document.getElementById('plusSettings');
-          var walkwayInput = document.getElementById('walkwayWidth');
-          var canvasWidthInput = document.getElementById('canvasWidth');
-          var canvasHeightInput = document.getElementById('canvasHeight');
-
-          canvas.style.display = 'none';
-          scoreboard.style.display = 'none';
-          restartButton.hidden = true;
-
-          try {
-            var saved = localStorage.getItem('weaponConfig');
-            if (saved) {
-              var parsed = JSON.parse(saved);
-              for (var type in parsed) {
-                if (typeof WEAPON_TYPES !== 'undefined' && WEAPON_TYPES[type]) {
-                  var cfg = parsed[type];
-                  for (var prop in cfg) {
-                    if (typeof cfg[prop] === 'number') {
-                      WEAPON_TYPES[type][prop] = cfg[prop];
-                    }
+          const saved = localStorage.getItem('weaponConfig');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            for (const type in parsed) {
+              if (WEAPON_TYPES[type]) {
+                const cfg = parsed[type];
+                for (const prop in cfg) {
+                  // Only overwrite number properties
+                  if (typeof cfg[prop] === 'number') {
+                    WEAPON_TYPES[type][prop] = cfg[prop];
                   }
                 }
               }
             }
-          } catch (e) { console.warn('Failed to load weapon config', e); }
+          }
+        } catch (e) {
+          console.warn('Failed to load weapon config', e);
+        }
 
-          // snapshot defaults
-          var initialWeaponConfig = {};
-          if (typeof WEAPON_TYPES !== 'undefined') {
-            for (var t in WEAPON_TYPES) {
-              initialWeaponConfig[t] = {};
-              var def = WEAPON_TYPES[t];
-              for (var p in def) {
-                if (typeof def[p] === 'number') initialWeaponConfig[t][p] = def[p];
-              }
+        // Capture a snapshot of the default numeric weapon configuration. This
+        // will be used by the reset button in the weapon configuration modal
+        // to restore WEAPON_TYPES to its original state. Only numeric
+        // properties are stored to avoid copying functions or nested objects.
+        const initialWeaponConfig = {};
+        for (const type in WEAPON_TYPES) {
+          initialWeaponConfig[type] = {};
+          const def = WEAPON_TYPES[type];
+          for (const prop in def) {
+            if (typeof def[prop] === 'number') {
+              initialWeaponConfig[type][prop] = def[prop];
             }
           }
+        }
 
-          function createPlayerRow(index) {
-            var row = document.createElement('div');
+        // Generate player configuration rows based on selected player count
+        function updatePlayerConfigs() {
+          // Grab default colors from the global definition if available. Fallback to empty
+          // object to avoid reference errors when the variable is undefined. Using
+          // a local alias speeds up access in the loop below.
+          const defaultColors = (typeof DEFAULT_COLORS !== 'undefined' ? DEFAULT_COLORS : {});
+          const count = parseInt(playerCountSelect.value);
+          playerConfigsDiv.innerHTML = '';
+          for (let i = 0; i < count; i++) {
+            const row = document.createElement('div');
             row.style.display = 'flex';
             row.style.alignItems = 'center';
             row.style.marginBottom = '6px';
-
-            var span = document.createElement('span');
-            span.style.marginRight = '8px';
-            span.textContent = 'Player ' + (index + 1) + ':';
-            row.appendChild(span);
-
-            var labelWeapon = document.createElement('label');
-            labelWeapon.style.marginRight = '4px';
-            labelWeapon.textContent = 'Weapon ';
-            var select = document.createElement('select');
-            select.className = 'weaponSelect';
-            select.style.marginRight = '12px';
-            var weapons = ['sword','spear','dagger','bow','shield','staff','scythe','unarmed','dummy'];
-            for (var i=0;i<weapons.length;i++){
-              var opt = document.createElement('option');
-              opt.value = weapons[i];
-              opt.textContent = weapons[i].charAt(0).toUpperCase() + weapons[i].slice(1);
-              select.appendChild(opt);
+            // Create HTML for weapon select, color input and HP input
+            row.innerHTML = `
+              <span style="margin-right:8px;">Player ${i + 1}:</span>
+              <label style="margin-right:4px;">Weapon
+                <select class="weaponSelect" style="margin-right:12px;">
+                  <option value="sword">Sword</option>
+                  <option value="spear">Spear</option>
+                  <option value="dagger">Dagger</option>
+                  <option value="bow">Bow</option>
+                  <option value="shield">Shield</option>
+                  <option value="staff">Staff</option>
+                  <option value="scythe">Scythe</option>
+ <option value="unarmed">Unarmed</option>
+                  <option value="dummy">Dummy</option>
+                </select>
+              </label>
+              <label style="margin-right:4px;">Color
+                <input type="color" class="colorInput" value="#ffffff" style="margin-right:12px;">
+              </label>
+              <label>HP
+                <input type="number" class="hpInput" value="250" min="1" style="width:60px;">
+              </label>
+            `;
+            playerConfigsDiv.appendChild(row);
+            // After the row has been inserted, set default color based on weapon
+            const weaponSelect = row.querySelector('.weaponSelect');
+            const colorInput = row.querySelector('.colorInput');
+            // Set default color to match the selected weapon at creation
+            const initialType = weaponSelect.value;
+            if (defaultColors && defaultColors[initialType]) {
+              colorInput.value = defaultColors[initialType];
             }
-            labelWeapon.appendChild(select);
-            row.appendChild(labelWeapon);
-
-            var labelColor = document.createElement('label');
-            labelColor.style.marginRight = '4px';
-            labelColor.textContent = 'Color ';
-            var colorInput = document.createElement('input');
-            colorInput.type = 'color';
-            colorInput.className = 'colorInput';
-            colorInput.value = '#ffffff';
-            colorInput.style.marginRight = '12px';
-            labelColor.appendChild(colorInput);
-            row.appendChild(labelColor);
-
-            var labelHP = document.createElement('label');
-            labelHP.textContent = 'HP ';
-            var hpInput = document.createElement('input');
-            hpInput.type = 'number';
-            hpInput.className = 'hpInput';
-            hpInput.value = '250';
-            hpInput.min = '1';
-            hpInput.style.width = '60px';
-            labelHP.appendChild(hpInput);
-            row.appendChild(labelHP);
-
-            if (typeof DEFAULT_COLORS !== 'undefined') {
-              var initType = select.value;
-              if (DEFAULT_COLORS[initType]) colorInput.value = DEFAULT_COLORS[initType];
-            }
-            select.addEventListener('change', function() {
-              var t = this.value;
-              if (typeof DEFAULT_COLORS !== 'undefined' && DEFAULT_COLORS[t]) {
-                var siblingColor = this.parentNode.parentNode.querySelector('.colorInput');
-                if (siblingColor) siblingColor.value = DEFAULT_COLORS[t];
+            // Change color when weapon selection changes
+            weaponSelect.addEventListener('change', () => {
+              const type = weaponSelect.value;
+              if (defaultColors && defaultColors[type]) {
+                colorInput.value = defaultColors[type];
               }
             });
-
-            return row;
           }
+        }
+        // Initialize config rows
+        updatePlayerConfigs();
+        // Update config rows when player count changes
+        playerCountSelect.addEventListener('change', updatePlayerConfigs);
 
-          function updatePlayerConfigs() {
-            var count = parseInt(playerCountSelect.value, 10);
-            playerConfigsDiv.innerHTML = '';
-            for (var i = 0; i < count; i++) {
-              var r = createPlayerRow(i);
-              playerConfigsDiv.appendChild(r);
-            }
-          }
+        // Initialize plus settings visibility based on default map type
+        plusSettings.style.display = mapTypeSelect.value === 'plus' ? 'block' : 'none';
 
-          updatePlayerConfigs();
-          playerCountSelect.addEventListener('change', updatePlayerConfigs);
-
+        // Show/hide walkway width input based on map type
+        mapTypeSelect.addEventListener('change', () => {
           plusSettings.style.display = mapTypeSelect.value === 'plus' ? 'block' : 'none';
-          mapTypeSelect.addEventListener('change', function() {
-            plusSettings.style.display = mapTypeSelect.value === 'plus' ? 'block' : 'none';
-          });
+        });
 
-          startBtn.addEventListener('click', function() {
-            var gravityVal = parseFloat(gravityInput.value);
-            if (!isNaN(gravityVal)) GRAVITY = gravityVal;
-            MAP_TYPE = mapTypeSelect.value;
-            if (MAP_TYPE === 'plus') {
-              var wv = parseFloat(walkwayInput.value);
-              if (!isNaN(wv) && wv > 0) WALKWAY_WIDTH = wv;
+        // Start the game when the user clicks the start button
+        startBtn.addEventListener('click', () => {
+          // Apply selected gravity globally. The GRAVITY constant is
+          // defined with let in gameConfig.js so it can be reassigned.
+          const gravityVal = parseFloat(gravityInput.value);
+          if (!isNaN(gravityVal)) {
+            // Assign directly to the global GRAVITY variable rather than
+            // setting a property on window. Using window.GRAVITY would
+            // create a new property instead of updating the imported
+            // variable defined with let.
+            GRAVITY = gravityVal;
+          }
+          // Apply selected map settings globally. Assign to the global
+          // variables MAP_TYPE and WALKWAY_WIDTH (from gameConfig.js)
+          MAP_TYPE = mapTypeSelect.value;
+          if (MAP_TYPE === 'plus') {
+            const wv = parseFloat(walkwayInput.value);
+            if (!isNaN(wv) && wv > 0) {
+              WALKWAY_WIDTH = wv;
             }
-            var cw = parseInt(canvasWidthInput.value, 10);
-            var ch = parseInt(canvasHeightInput.value, 10);
-            if (!isNaN(cw) && cw > 0 && !isNaN(ch) && ch > 0) {
-              canvas.width = cw;
-              canvas.height = ch;
-              var container = document.getElementById('container');
-              if (container) {
-                container.style.width = cw + 'px';
-                container.style.height = (ch + 40) + 'px';
-              }
+          }
+          // Apply selected canvas size
+          const cw = parseInt(canvasWidthInput.value);
+          const ch = parseInt(canvasHeightInput.value);
+          if (!isNaN(cw) && cw > 0 && !isNaN(ch) && ch > 0) {
+            canvas.width = cw;
+            canvas.height = ch;
+            // Adjust container dimensions to wrap the new canvas size and scoreboard
+            const container = document.getElementById('container');
+            container.style.width = cw + 'px';
+            container.style.height = (ch + 40) + 'px';
+          }
+          // Build spawn configuration array based on menu selections
+          const configs = [];
+          const count = parseInt(playerCountSelect.value);
+          const children = playerConfigsDiv.children;
+          for (let i = 0; i < count; i++) {
+            const row = children[i];
+            const weapon = row.querySelector('.weaponSelect').value;
+            const color = row.querySelector('.colorInput').value;
+            const hp = parseFloat(row.querySelector('.hpInput').value) || 250;
+            // Evenly space players along the width: (i+1)/(count+1)
+            const xRel = (i + 1) / (count + 1);
+            configs.push({ x: xRel, y: 0.5, weaponType: weapon, color: color, health: hp });
+          }
+          // Hide menu and show game area
+          menu.style.display = 'none';
+          canvas.style.display = '';
+          scoreboard.style.display = '';
+          // Start a new game with the custom configuration
+          // eslint-disable-next-line no-undef
+          game = new Game({ spawnConfigs: configs });
+          // Store current configuration for restarts
+          window.currentSpawnConfigs = configs;
+          // Configure restart button to restart with the same settings
+          restartButton.onclick = function() {
+            game = new Game({ spawnConfigs: window.currentSpawnConfigs });
+            this.hidden = true;
+          };
+        });
+
+        // Build and show the weapon configuration modal when the user
+        // clicks the "Configure Weapons" button. This modal allows
+        // adjusting the base stats and buff values of each weapon type.
+        weaponConfigBtn.addEventListener('click', () => {
+          // Clear any existing content
+          weaponConfigModal.innerHTML = '';
+          // Build inner container
+          const wrapper = document.createElement('div');
+          wrapper.style.maxWidth = '900px';
+          wrapper.style.margin = '40px auto';
+          wrapper.style.background = '#333';
+          wrapper.style.padding = '20px';
+          wrapper.style.borderRadius = '8px';
+          wrapper.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
+          // Header
+          const h = document.createElement('h2');
+          h.textContent = 'Weapon Configuration';
+          h.style.marginBottom = '10px';
+          wrapper.appendChild(h);
+          // Instruction
+          const info = document.createElement('p');
+          info.textContent = 'Adjust base statistics and buff values for each weapon type. Values persist across sessions.';
+          info.style.fontSize = '14px';
+          info.style.marginBottom = '20px';
+          wrapper.appendChild(info);
+          // Build a form with inputs for each weapon type
+          const form = document.createElement('div');
+          // For each weapon type defined in WEAPON_TYPES
+          for (const type in WEAPON_TYPES) {
+            const def = WEAPON_TYPES[type];
+            const fieldset = document.createElement('fieldset');
+            fieldset.style.border = '1px solid #555';
+            fieldset.style.marginBottom = '12px';
+            fieldset.style.padding = '10px';
+            const legend = document.createElement('legend');
+            legend.textContent = def.name;
+            legend.style.padding = '0 6px';
+            fieldset.appendChild(legend);
+            // Helper to create labeled inputs
+            function addInput(label, prop, step = '1') {
+              const container = document.createElement('div');
+              container.style.display = 'flex';
+              container.style.alignItems = 'center';
+              container.style.marginBottom = '6px';
+              const lbl = document.createElement('label');
+              lbl.style.marginRight = '4px';
+              lbl.textContent = label;
+              const inp = document.createElement('input');
+              inp.type = 'number';
+              inp.step = step;
+              inp.style.width = '70px';
+              inp.dataset.weapon = type;
+              inp.dataset.prop = prop;
+              // Use current value or blank if not defined
+              const current = def[prop];
+              inp.value = typeof current === 'number' ? current : '';
+              container.appendChild(lbl);
+              container.appendChild(inp);
+              fieldset.appendChild(container);
             }
-            var configs = [];
-            var count = parseInt(playerCountSelect.value, 10);
-            var children = playerConfigsDiv.children;
-            for (var i=0;i<count;i++) {
-              var row = children[i];
-              var weapon = row.querySelector('.weaponSelect').value;
-              var color = row.querySelector('.colorInput').value;
-              var hp = parseFloat(row.querySelector('.hpInput').value) || 250;
-              var xRel = (i + 1) / (count + 1);
-              configs.push({ x: xRel, y: 0.5, weaponType: weapon, color: color, health: hp });
-            }
-            menu.style.display = 'none';
-            canvas.style.display = '';
-            scoreboard.style.display = '';
+            // Base stats
+            addInput('Base Range', 'baseRange');
+            addInput('Base Damage', 'baseDamage');
+            addInput('Base Speed', 'baseSpeed', '0.001');
+            addInput('Move Speed', 'moveSpeed', '0.01');
+            addInput('Thickness', 'thickness');
+            // Maximum range a weapon can grow to when buffed. If omitted,
+            // the global MAX_RANGE applies. Allow configuring this to
+            // balance range buffs.
+            addInput('Max Range', 'maxRange');
+            // Staff and scythe specific stats
+            addInput('Fireball Damage', 'fireballDamage');
+            addInput('Fireball Radius', 'fireballRadius');
+            addInput('Fireball Cooldown', 'fireballCooldown');
+            addInput('Poison Damage', 'poisonDamage');
+            addInput('Poison Duration', 'poisonDuration');
+            // Buff stats
+            addInput('Buff Damage', 'buffDamage');
+            addInput('Buff Range', 'buffRange');
+            addInput('Buff Spin', 'buffSpin');
+            addInput('Buff Arrows', 'buffArrows');
+            addInput('Buff Thickness', 'buffThickness');
+            addInput('Buff Radius', 'buffRadius');
+            addInput('Buff Duration', 'buffDuration');
+            addInput('Max Thickness', 'maxThickness');
+            form.appendChild(fieldset);
+          }
+          wrapper.appendChild(form);
+          // Buttons
+          const btnRow = document.createElement('div');
+          btnRow.style.display = 'flex';
+          btnRow.style.justifyContent = 'flex-end';
+          btnRow.style.gap = '10px';
+          btnRow.style.marginTop = '20px';
+          const saveBtn = document.createElement('button');
+          saveBtn.textContent = 'Save';
+          saveBtn.style.padding = '6px 12px';
+          saveBtn.style.background = '#4caf50';
+          saveBtn.style.border = 'none';
+          saveBtn.style.color = '#fff';
+          saveBtn.style.cursor = 'pointer';
+          const resetBtn = document.createElement('button');
+          resetBtn.textContent = 'Reset';
+          resetBtn.style.padding = '6px 12px';
+          resetBtn.style.background = '#ff9800';
+          resetBtn.style.border = 'none';
+          resetBtn.style.color = '#fff';
+          resetBtn.style.cursor = 'pointer';
+          const cancelBtn = document.createElement('button');
+          cancelBtn.textContent = 'Cancel';
+          cancelBtn.style.padding = '6px 12px';
+          cancelBtn.style.background = '#f44336';
+          cancelBtn.style.border = 'none';
+          cancelBtn.style.color = '#fff';
+          cancelBtn.style.cursor = 'pointer';
+          btnRow.appendChild(cancelBtn);
+          btnRow.appendChild(resetBtn);
+          btnRow.appendChild(saveBtn);
+          wrapper.appendChild(btnRow);
+          weaponConfigModal.appendChild(wrapper);
+          // Show the modal
+          weaponConfigModal.style.display = 'block';
+          // Cancel just hides the modal without saving
+          cancelBtn.onclick = () => {
+            weaponConfigModal.style.display = 'none';
+          };
+          // Reset restores all weapon stats to their original default values
+          resetBtn.onclick = () => {
+            // Remove any persisted configuration from localStorage
             try {
-              game = new Game({ spawnConfigs: configs });
+              localStorage.removeItem('weaponConfig');
             } catch (e) {
-              console.error('Failed to construct Game:', e);
-              showBanner('Error: 无法启动游戏（Game 构造器不可用）。', 10000);
+              console.warn('Failed to remove weapon config', e);
             }
-            window.currentSpawnConfigs = configs;
-            restartButton.onclick = function() {
-              try {
-                game = new Game({ spawnConfigs: window.currentSpawnConfigs });
-                this.hidden = true;
-              } catch (e) {
-                console.error('Restart failed:', e);
-              }
-            };
-          });
-
-          // weapon modal 逻辑（保留）
-          weaponConfigBtn.addEventListener('click', function() {
-            weaponConfigModal.innerHTML = '';
-            var wrapper = document.createElement('div');
-            wrapper.style.maxWidth = '900px';
-            wrapper.style.margin = '40px auto';
-            wrapper.style.background = '#333';
-            wrapper.style.padding = '20px';
-            wrapper.style.borderRadius = '8px';
-            wrapper.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
-
-            var h = document.createElement('h2');
-            h.textContent = 'Weapon Configuration';
-            h.style.marginBottom = '10px';
-            wrapper.appendChild(h);
-
-            var info = document.createElement('p');
-            info.textContent = 'Adjust base statistics and buff values for each weapon type. Values persist across sessions.';
-            info.style.fontSize = '14px';
-            info.style.marginBottom = '20px';
-            wrapper.appendChild(info);
-
-            var form = document.createElement('div');
-            if (typeof WEAPON_TYPES !== 'undefined') {
-              for (var type in WEAPON_TYPES) {
-                var def = WEAPON_TYPES[type];
-                var fieldset = document.createElement('fieldset');
-                fieldset.style.border = '1px solid #555';
-                fieldset.style.marginBottom = '12px';
-                fieldset.style.padding = '10px';
-                var legend = document.createElement('legend');
-                legend.textContent = def.name || type;
-                legend.style.padding = '0 6px';
-                fieldset.appendChild(legend);
-
-                function addInputDOM(labelText, prop, step) {
-                  step = step || '1';
-                  var container = document.createElement('div');
-                  container.style.display = 'flex';
-                  container.style.alignItems = 'center';
-                  container.style.marginBottom = '6px';
-                  var lbl = document.createElement('label');
-                  lbl.style.marginRight = '4px';
-                  lbl.textContent = labelText;
-                  var inp = document.createElement('input');
-                  inp.type = 'number';
-                  inp.step = step;
-                  inp.style.width = '70px';
-                  inp.setAttribute('data-weapon', type);
-                  inp.setAttribute('data-prop', prop);
-                  var current = def[prop];
-                  inp.value = (typeof current === 'number') ? current : '';
-                  container.appendChild(lbl);
-                  container.appendChild(inp);
-                  fieldset.appendChild(container);
+            // Restore numeric properties on WEAPON_TYPES from the snapshot
+            for (const type in initialWeaponConfig) {
+              if (WEAPON_TYPES[type]) {
+                const defaults = initialWeaponConfig[type];
+                for (const prop in defaults) {
+                  WEAPON_TYPES[type][prop] = defaults[prop];
                 }
-
-                addInputDOM('Base Range', 'baseRange');
-                addInputDOM('Base Damage', 'baseDamage');
-                addInputDOM('Base Speed', 'baseSpeed', '0.001');
-                addInputDOM('Move Speed', 'moveSpeed', '0.01');
-                addInputDOM('Thickness', 'thickness');
-                addInputDOM('Max Range', 'maxRange');
-                addInputDOM('Fireball Damage', 'fireballDamage');
-                addInputDOM('Fireball Radius', 'fireballRadius');
-                addInputDOM('Fireball Cooldown', 'fireballCooldown');
-                addInputDOM('Poison Damage', 'poisonDamage');
-                addInputDOM('Poison Duration', 'poisonDuration');
-                addInputDOM('Buff Damage', 'buffDamage');
-                addInputDOM('Buff Range', 'buffRange');
-                addInputDOM('Buff Spin', 'buffSpin');
-                addInputDOM('Buff Arrows', 'buffArrows');
-                addInputDOM('Buff Thickness', 'buffThickness');
-                addInputDOM('Buff Radius', 'buffRadius');
-                addInputDOM('Buff Duration', 'buffDuration');
-                addInputDOM('Max Thickness', 'maxThickness');
-
-                form.appendChild(fieldset);
               }
             }
-            wrapper.appendChild(form);
-
-            var btnRow = document.createElement('div');
-            btnRow.style.display = 'flex';
-            btnRow.style.justifyContent = 'flex-end';
-            btnRow.style.gap = '10px';
-            btnRow.style.marginTop = '20px';
-
-            var cancelBtn = document.createElement('button');
-            cancelBtn.textContent = 'Cancel';
-            cancelBtn.style.padding = '6px 12px';
-            cancelBtn.style.background = '#f44336';
-            cancelBtn.style.border = 'none';
-            cancelBtn.style.color = '#fff';
-            cancelBtn.style.cursor = 'pointer';
-
-            var resetBtn = document.createElement('button');
-            resetBtn.textContent = 'Reset';
-            resetBtn.style.padding = '6px 12px';
-            resetBtn.style.background = '#ff9800';
-            resetBtn.style.border = 'none';
-            resetBtn.style.color = '#fff';
-            resetBtn.style.cursor = 'pointer';
-
-            var saveBtn = document.createElement('button');
-            saveBtn.textContent = 'Save';
-            saveBtn.style.padding = '6px 12px';
-            saveBtn.style.background = '#4caf50';
-            saveBtn.style.border = 'none';
-            saveBtn.style.color = '#fff';
-            saveBtn.style.cursor = 'pointer';
-
-            btnRow.appendChild(cancelBtn);
-            btnRow.appendChild(resetBtn);
-            btnRow.appendChild(saveBtn);
-            wrapper.appendChild(btnRow);
-
-            weaponConfigModal.appendChild(wrapper);
-            weaponConfigModal.style.display = 'block';
-
-            cancelBtn.onclick = function() { weaponConfigModal.style.display = 'none'; };
-            resetBtn.onclick = function() {
-              try { localStorage.removeItem('weaponConfig'); } catch(e) { console.warn(e); }
-              for (var t in initialWeaponConfig) {
-                if (WEAPON_TYPES[t]) {
-                  var defaults = initialWeaponConfig[t];
-                  for (var p in defaults) WEAPON_TYPES[t][p] = defaults[p];
+            // Update input fields in the modal to reflect default values
+            const inputs = weaponConfigModal.querySelectorAll('input[data-weapon]');
+            inputs.forEach(inp => {
+              const t = inp.dataset.weapon;
+              const p = inp.dataset.prop;
+              if (initialWeaponConfig[t] && initialWeaponConfig[t][p] !== undefined) {
+                inp.value = initialWeaponConfig[t][p];
+              } else {
+                inp.value = '';
+              }
+            });
+            alert('Weapon configurations have been reset to defaults.');
+          };
+          // Save collects values and persists them to localStorage and
+          // updates the global WEAPON_TYPES object
+          saveBtn.onclick = () => {
+            const configs = {};
+            // Iterate all inputs inside the modal
+            const inputs = weaponConfigModal.querySelectorAll('input[data-weapon]');
+            inputs.forEach(inp => {
+              const w = inp.dataset.weapon;
+              const prop = inp.dataset.prop;
+              const val = parseFloat(inp.value);
+              if (!configs[w]) configs[w] = {};
+              if (!isNaN(val)) configs[w][prop] = val;
+            });
+            // Persist to localStorage
+            try {
+              localStorage.setItem('weaponConfig', JSON.stringify(configs));
+            } catch (e) {
+              console.warn('Failed to save weapon config', e);
+            }
+            // Apply to global WEAPON_TYPES
+            for (const w in configs) {
+              const cfg = configs[w];
+              if (WEAPON_TYPES[w]) {
+                for (const prop in cfg) {
+                  WEAPON_TYPES[w][prop] = cfg[prop];
                 }
               }
-              var inputs = weaponConfigModal.querySelectorAll('input[data-weapon]');
-              for (var k = 0; k < inputs.length; k++) {
-                var inp = inputs[k];
-                var wt = inp.getAttribute('data-weapon');
-                var pr = inp.getAttribute('data-prop');
-                if (initialWeaponConfig[wt] && typeof initialWeaponConfig[wt][pr] !== 'undefined') inp.value = initialWeaponConfig[wt][pr];
-                else inp.value = '';
-              }
-              alert('Weapon configurations have been reset to defaults.');
-            };
-            saveBtn.onclick = function() {
-              var configs = {};
-              var inputs = weaponConfigModal.querySelectorAll('input[data-weapon]');
-              for (var j = 0; j < inputs.length; j++) {
-                var inp = inputs[j];
-                var w = inp.getAttribute('data-weapon');
-                var prop = inp.getAttribute('data-prop');
-                var val = parseFloat(inp.value);
-                if (!configs[w]) configs[w] = {};
-                if (!isNaN(val)) configs[w][prop] = val;
-              }
-              try { localStorage.setItem('weaponConfig', JSON.stringify(configs)); } catch(e) { console.warn(e); }
-              for (var w in configs) {
-                var cfg = configs[w];
-                if (WEAPON_TYPES[w]) {
-                  for (var prop2 in cfg) WEAPON_TYPES[w][prop2] = cfg[prop2];
-                }
-              }
-              weaponConfigModal.style.display = 'none';
-            };
-          });
-        })();
-      } // end bindUI
-
-      // startApp: load scripts -> dynamic import 补救 -> bindUI
-      (async function() {
-        var required = ['gameConfig.js', 'utils.js', 'player.js', 'game.js'];
-        var res = await loadRequiredScriptsInOrder(required);
-        if (res.failed && res.failed.length > 0) {
-          // 输出更详细信息以便你或我进一步排查
-          console.warn('Some files failed to load:', res.failed);
-          // 继续尝试 dynamic import 补救，然后再启动（如果可以）
-          var ok = await tryDynamicImportIfNeeded();
-          if (!ok) {
-            showBanner('Error: 有脚本无法加载或被服务器返回为 HTML。请在 DevTools → Network 检查 gameConfig.js/game.js 的响应。', 15000);
-            console.error('Files failed:', res.failed);
-            return;
-          }
-        }
-        // final check: Game/WEAPON_TYPES 可用则绑定 UI
-        if (typeof WEAPON_TYPES === 'undefined') {
-          console.warn('WEAPON_TYPES 未定义（加载后）。');
-          showBanner('Warning: WEAPON_TYPES 未定义 — 请检查 gameConfig.js 是否正确部署并可访问（Network）。', 10000);
-        }
-        if (typeof Game === 'undefined' && typeof window.Game === 'undefined') {
-          var di = await tryDynamicImportIfNeeded();
-          if (!di) {
-            showBanner('Error: Game 未加载。请检查 game.js 是否正确部署（Network）。', 10000);
-            return;
-          }
-        }
-        bindUI();
-      })();
-    </script>
-
-    <script>
-      window.onerror = function(msg, url, line, col, err) {
-        try {
-          var div = document.createElement('div');
-          div.style.position = 'fixed';
-          div.style.bottom = '10px';
-          div.style.left = '10px';
-          div.style.background = '#f44336';
-          div.style.color = '#fff';
-          div.style.padding = '4px 8px';
-          div.style.zIndex = 5000;
-          div.textContent = 'Error: ' + msg + ' at ' + line + ':' + col;
-          document.body.appendChild(div);
-        } catch (e) {}
-      };
+            }
+            // Hide modal
+            weaponConfigModal.style.display = 'none';
+          };
+        });
+      });
     </script>
   </body>
 </html>
