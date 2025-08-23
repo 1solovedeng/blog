@@ -1,7 +1,8 @@
 /*
  * Main game loop and logic.
  * (Modified: adds texture loading and sprite-based weapon/arrow rendering,
- *  and draws health numbers on the player circles.)
+ *  draws health numbers on the player circles, and adds a black outline
+ *  around each player circle for better visibility.)
  */
 
 // Grab UI elements and canvas context up front so they are available
@@ -825,7 +826,7 @@ function resolveBodyCollision(p1, p2) {
   }
 }
 
-/* -------------------- Override Player.draw to use textures and draw health -------------------- */
+/* -------------------- Override Player.draw to use textures and draw health + outline -------------------- */
 function installPlayerDrawOverride() {
   if (typeof Player === 'undefined') {
     console.warn('Player class not found - texture & health draw override skipped.');
@@ -841,6 +842,17 @@ function installPlayerDrawOverride() {
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
     ctx.fill();
+
+    // --- ADDED: draw black outline around the player circle ---
+    try {
+      // outline width relative to radius, but clamped to sensible range
+      const outlineWidth = Math.max(2, Math.min(6, Math.floor(this.radius * 0.12)));
+      ctx.lineWidth = outlineWidth;
+      ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+      ctx.stroke();
+    } catch (e) {
+      // ignore outline errors
+    }
     ctx.closePath();
 
     // draw weapon as texture if available, otherwise as stroke
