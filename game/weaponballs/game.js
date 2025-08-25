@@ -1038,4 +1038,57 @@ function installPlayerDrawOverride() {
           const bladeRadius = length * (this.scytheBladeRadiusRatio || (wdef && wdef.scythe && wdef.scythe.bladeRadiusRatio) || 0.45);
           ctx.beginPath();
           const startA = angle - Math.PI/2, endA = angle + Math.PI/2;
-          ctx.moveTo(shaftEnd.x + Math.cos(startA)*bladeRadius, shaftEnd.y + Math.sin(*
+          ctx.moveTo(shaftEnd.x + Math.cos(startA)*bladeRadius, shaftEnd.y + Math.sin(startA)*bladeRadius);
+          ctx.arc(shaftEnd.x, shaftEnd.y, bladeRadius, startA, endA);
+          ctx.closePath();
+          ctx.fillStyle = this.color;
+          ctx.globalAlpha = 0.9;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+      } else {
+        if (img && img.complete && img.naturalWidth) {
+          ctx.translate(base.x, base.y);
+          ctx.rotate(angle + (wdef && wdef.angleOffset || 0));
+          const anchor = (wdef && wdef.textureAnchor) ? wdef.textureAnchor : {x:0,y:0.5};
+          ctx.drawImage(img, -anchor.x * length, -anchor.y * (thickness), length, thickness);
+          ctx.setTransform(1,0,0,1,0,0);
+        } else {
+          ctx.strokeStyle = this.color;
+          ctx.lineWidth = thickness;
+          ctx.beginPath();
+          ctx.moveTo(base.x, base.y);
+          ctx.lineTo(tip.x, tip.y);
+          ctx.stroke();
+          ctx.closePath();
+        }
+      }
+
+    } catch (e) { console.warn('Player draw error:', e); }
+
+    try {
+      const hp = Math.max(0, Math.round(this.health || 0));
+      const fontSize = Math.max(10, Math.floor(this.radius * 0.8));
+      ctx.font = `${fontSize}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = Math.max(2, Math.floor(fontSize / 6));
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.strokeText(String(hp), this.x, this.y);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(String(hp), this.x, this.y);
+    } catch (e) { console.warn('Failed to draw health text:', e); }
+
+    ctx.restore();
+  };
+}
+installPlayerDrawOverride();
+
+/* -------------------- expose Game -------------------- */
+window.Game = Game;
+
+/* -------------------- 使用示例（可删除） -------------------- */
+/*
+  registerWeapon({ key:'hammer', name:'Hammer', texture:'hammer.png', thickness:18, baseRange:70 });
+  // spawnConfig 指定 weaponType:'hammer' 即可使用
+*/
