@@ -1,4 +1,4 @@
-/* 完整 game.js（包含“棍子 + 半圆”镰刀判定） */
+/* 完整 game.js（包含“矩形 + 半圆”镰刀判定） */
 /* 请将此文件替换原来的 game.js —— 仅改动 game.js */
 
 const canvas = document.getElementById('gameCanvas');
@@ -11,14 +11,14 @@ let height = canvas.height;
 /* 配置贴图路径 & 元数据（如需） */
 const BASE_TEXTURE_PATH = 'assets/textures/';
 const TEXTURE_META = {
-  sword:  { file: 'sword.png',  anchor: { x: 0.06, y: 0.5 }, angleOffset: 0,       scale: 1.0, collisionScale: 1.0 },
-  spear:  { file: 'spear.png',  anchor: { x: 0.06, y: 0.5 }, angleOffset: 0,       scale: 1.0, collisionScale: 1.0 },
-  dagger: { file: 'dagger.png', anchor: { x: 0.06, y: 0.5 }, angleOffset: 0,       scale: 1.0, collisionScale: 1.0 },
-  bow:    { file: 'bow.png',    anchor: { x: 0.12, y: 0.5 }, angleOffset: 0.0,     scale: 1.0, collisionScale: 1.0 },
-  shield: { file: 'shield.png', anchor: { x: 0.02, y: 0.5 }, angleOffset: 0,       scale: 1.0, collisionScale: 1.0 },
-  scythe: { file: 'scythe.png', anchor: { x: 0.12, y: 0.5 }, angleOffset: -Math.PI/2, scale: 1.0, collisionScale: 1.0 },
-  arrow:  { file: 'arrow.png',  anchor: { x: 0.5,  y: 0.5 }, angleOffset: 0,       scale: 1.0, collisionScale: 1.0 },
-  fireball:{file: 'fireball.png',anchor:{ x:0.5, y:0.5 }, angleOffset:0, scale:1.0, collisionScale:1.0}
+  sword:   { file: 'sword.png',   anchor: { x: 0.06, y: 0.5 }, angleOffset: 0,           scale: 1.0, collisionScale: 1.0 },
+  spear:   { file: 'spear.png',   anchor: { x: 0.06, y: 0.5 }, angleOffset: 0,           scale: 1.0, collisionScale: 1.0 },
+  dagger:  { file: 'dagger.png',  anchor: { x: 0.06, y: 0.5 }, angleOffset: 0,           scale: 1.0, collisionScale: 1.0 },
+  bow:     { file: 'bow.png',     anchor: { x: 0.12, y: 0.5 }, angleOffset: 0.0,         scale: 1.0, collisionScale: 1.0 },
+  shield:  { file: 'shield.png',  anchor: { x: 0.02, y: 0.5 }, angleOffset: 0,           scale: 1.0, collisionScale: 1.0 },
+  scythe:  { file: 'scythe.png',  anchor: { x: 0.12, y: 0.5 }, angleOffset: -Math.PI/2, scale: 1.0, collisionScale: 1.0 },
+  arrow:   { file: 'arrow.png',   anchor: { x: 0.5,  y: 0.5 }, angleOffset: 0,           scale: 1.0, collisionScale: 1.0 },
+  fireball:{ file: 'fireball.png',anchor: { x: 0.5,  y: 0.5 }, angleOffset: 0,           scale: 1.0, collisionScale: 1.0 }
 };
 window.WEAPON_TEXTURES = window.WEAPON_TEXTURES || {};
 function preloadTextures() {
@@ -126,55 +126,69 @@ function segmentIntersectsPolygon(a,b,poly) {
   return false;
 }
 
-/* ------------------ 新：把镰刀做为“矩形 + 半圆”多边形 ------------------
+/* ---------------- SCYTHE defaults (global, 可修改) ---------------- */
+window.SCYTHE_DEFAULTS = {
+  shaftRatio: 0.55,
+  bladeRadiusRatio: 0.45,
+  resolution: 20,
+  widthMultiplier: 1.0,
+  debugShowHitbox: false
+};
+
+/* ------------------ 新：把镰刀做为“矩形（棍子） + 半圆（刀刃）”多边形 ------------------
    返回顺时针或逆时针的点数组（用于 pointInPolygon / 边相交检测）
    参数说明（可被 player 对象覆盖）：
-     p.scytheShaftRatio (默认 0.55) — 矩形（棍子）占 weaponLength 的比例
-     p.scytheBladeRadiusRatio (默认 0.45) — 半圆半径相对于 weaponLength 的比例
+     p.scytheShaftRatio (默认 window.SCYTHE_DEFAULTS.shaftRatio)
+     p.scytheBladeRadiusRatio (默认 window.SCYTHE_DEFAULTS.bladeRadiusRatio)
+     p.scytheResolution (默认 window.SCYTHE_DEFAULTS.resolution)
+     p.scytheWidthMultiplier (默认 window.SCYTHE_DEFAULTS.widthMultiplier)
+
    矩形从 base 到 shaftEnd，半圆以 shaftEnd 为圆心（沿 weaponAngle 的正面）
 */
-function buildScythePolygon(p, resolution=20) {
+function buildScythePolygon(p, resolution = undefined) {
   const base = (typeof p.getWeaponBase === 'function') ? p.getWeaponBase() : { x: p.x, y: p.y };
   const tip  = (typeof p.getWeaponTip === 'function') ? p.getWeaponTip() : { x: p.x + Math.cos(p.weaponAngle) * (p.weaponLength||80), y: p.y + Math.sin(p.weaponAngle) * (p.weaponLength||80) };
+
   const len = Math.hypot(tip.x - base.x, tip.y - base.y) || (p.weaponLength || 80);
   const dirx = (tip.x - base.x) / len;
   const diry = (tip.y - base.y) / len;
   const nx = -diry, ny = dirx; // outward normal (perp)
-  const shaftRatio = (typeof p.scytheShaftRatio === 'number') ? p.scytheShaftRatio : 0.55;
-  const bladeRadiusRatio = (typeof p.scytheBladeRadiusRatio === 'number') ? p.scytheBladeRadiusRatio : 0.45;
+
+  // get parameters with fallbacks
+  const shaftRatio = (typeof p.scytheShaftRatio === 'number') ? p.scytheShaftRatio : window.SCYTHE_DEFAULTS.shaftRatio;
+  const bladeRadiusRatio = (typeof p.scytheBladeRadiusRatio === 'number') ? p.scytheBladeRadiusRatio : window.SCYTHE_DEFAULTS.bladeRadiusRatio;
+  const res = (typeof p.scytheResolution === 'number') ? Math.max(6, Math.floor(p.scytheResolution)) : Math.max(6, Math.floor(resolution || window.SCYTHE_DEFAULTS.resolution));
+  const widthMul = (typeof p.scytheWidthMultiplier === 'number') ? p.scytheWidthMultiplier : window.SCYTHE_DEFAULTS.widthMultiplier;
+
   const shaftLen = len * shaftRatio;
   const bladeRadius = len * bladeRadiusRatio;
-  const halfWidth = (p.weaponThickness || 14) / 2;
+  const halfWidth = ((p.weaponThickness || 14) * widthMul) / 2;
 
-  // shaft end point (where semicircle is centered)
   const shaftEnd = { x: base.x + dirx * shaftLen, y: base.y + diry * shaftLen };
 
-  // rectangle corners (left base -> left end -> right end -> right base)
   const leftBase = { x: base.x + nx * halfWidth, y: base.y + ny * halfWidth };
   const rightBase = { x: base.x - nx * halfWidth, y: base.y - ny * halfWidth };
   const leftEnd = { x: shaftEnd.x + nx * halfWidth, y: shaftEnd.y + ny * halfWidth };
   const rightEnd = { x: shaftEnd.x - nx * halfWidth, y: shaftEnd.y - ny * halfWidth };
 
-  // semicircle points: we want the semi-circle to face outward from the player along the normal side.
-  // Use center at shaftEnd, and param angles from (angle - pi/2) to (angle + pi/2) so it forms a half-disk in front.
+  // semicircle facing outward: angles from baseAngle - PI/2 to baseAngle + PI/2
   const baseAngle = Math.atan2(diry, dirx);
   const startAngle = baseAngle - Math.PI/2;
   const endAngle = baseAngle + Math.PI/2;
   const semiPoints = [];
-  for (let i=0;i<=resolution;i++){
-    const t = i / resolution;
+  for (let i=0;i<=res;i++){
+    const t = i / res;
     const a = startAngle + (endAngle - startAngle) * t;
     semiPoints.push({ x: shaftEnd.x + Math.cos(a) * bladeRadius, y: shaftEnd.y + Math.sin(a) * bladeRadius });
   }
 
-  // Construct polygon: leftBase -> leftEnd -> semicircle (from start to end) -> rightEnd -> rightBase
   const poly = [];
   poly.push(leftBase);
   poly.push(leftEnd);
   for (let i=0;i<semiPoints.length;i++) poly.push(semiPoints[i]);
   poly.push(rightEnd);
   poly.push(rightBase);
-  // Note: polygon may be non-convex but that's fine for pointInPolygon tests and segment edge checks.
+
   return poly;
 }
 
@@ -193,7 +207,7 @@ function assignTextureToPlayer(p, img, meta) {
   p.textureAngleOffset = p.textureMeta.angleOffset || 0;
 }
 
-/* ------------------ Game class（其余逻辑保持原样，但把 scythe 判定替换为 buildScythePolygon） ------------------ */
+/* ------------------ Game class ------------------ */
 class Game {
   constructor(settings = {}) {
     this.settings = settings;
@@ -256,6 +270,8 @@ class Game {
       p.damageDealt = 0;
       p.damageReceived = 0;
       p.flashUntil = 0; p.weaponFlashUntil = 0; p.lastHit = p.lastHit || {};
+
+      // assign texture if loaded
       const img = window.WEAPON_TEXTURES[cfg.weaponType];
       if (img && img.__loaded) assignTextureToPlayer(p, img, img.__meta || TEXTURE_META[cfg.weaponType]);
       else {
@@ -268,11 +284,16 @@ class Game {
         p.textureAnchorPx = { x: 0, y: p.weaponThickness/2 };
         p.textureAngleOffset = (TEXTURE_META[cfg.weaponType] && TEXTURE_META[cfg.weaponType].angleOffset) || 0;
       }
+
       // scythe specific defaults (可由 menu 或 spawnConfigs 覆盖)
       if (p.weaponType === 'scythe') {
-        if (typeof p.scytheShaftRatio !== 'number') p.scytheShaftRatio = 0.55;
-        if (typeof p.scytheBladeRadiusRatio !== 'number') p.scytheBladeRadiusRatio = 0.45;
+        if (typeof p.scytheShaftRatio !== 'number') p.scytheShaftRatio = window.SCYTHE_DEFAULTS.shaftRatio;
+        if (typeof p.scytheBladeRadiusRatio !== 'number') p.scytheBladeRadiusRatio = window.SCYTHE_DEFAULTS.bladeRadiusRatio;
+        if (typeof p.scytheResolution !== 'number') p.scytheResolution = window.SCYTHE_DEFAULTS.resolution;
+        if (typeof p.scytheWidthMultiplier !== 'number') p.scytheWidthMultiplier = window.SCYTHE_DEFAULTS.widthMultiplier;
+        if (typeof p.debugShowScytheHitbox !== 'boolean') p.debugShowScytheHitbox = window.SCYTHE_DEFAULTS.debugShowHitbox;
       }
+
       this.players.push(p);
     });
 
@@ -328,6 +349,7 @@ class Game {
 
     for (const p of this.players) p.draw(ctx);
 
+    // 绘制武器纹理（保留你原来的绘制逻辑；scythe 仍然用纹理绘制，但判定使用多边形）
     for (const p of this.players) {
       if (p.health <= 0) continue;
       try {
@@ -373,10 +395,31 @@ class Game {
       } catch (e) { console.warn('weapon texture draw error', e); }
     }
 
+    // 如果需要，绘制 scythe 判定区域用于调试
+    for (const p of this.players) {
+      if (p.weaponType === 'scythe' && (p.debugShowScytheHitbox || window.SCYTHE_DEFAULTS.debugShowHitbox)) {
+        const poly = buildScythePolygon(p, p.scytheResolution || window.SCYTHE_DEFAULTS.resolution);
+        if (poly && poly.length) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = 'rgba(255,0,0,0.9)';
+          ctx.fillStyle = 'rgba(255,0,0,0.12)';
+          ctx.moveTo(poly[0].x, poly[0].y);
+          for (let i=1;i<poly.length;i++) ctx.lineTo(poly[i].x, poly[i].y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }
+
     this.drawDeathEffects(timestamp);
     this.drawArrows();
     if (typeof this.drawFireballs === 'function') this.drawFireballs();
 
+    // draw player circles + black outline + health text
     for (const p of this.players) {
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
@@ -470,7 +513,7 @@ class Game {
         const effectiveRadius = target.radius + (attacker.weaponThickness || 8)/2;
         let hit = false;
         if (attacker.weaponType === 'scythe') {
-          const poly = buildScythePolygon(attacker, 26);
+          const poly = buildScythePolygon(attacker, attacker.scytheResolution);
           if (pointInPolygon({x:target.x,y:target.y}, poly)) hit = true;
           else {
             // fallback: distance to shaft centerline (approx)
@@ -498,14 +541,14 @@ class Game {
       const isScy1 = p1.weaponType === 'scythe';
       const start1 = p1.getWeaponBase ? p1.getWeaponBase() : null;
       const tip1 = p1.getWeaponTip ? p1.getWeaponTip() : null;
-      const poly1 = isScy1 ? buildScythePolygon(p1,26) : null;
+      const poly1 = isScy1 ? buildScythePolygon(p1, p1.scytheResolution) : null;
       for (let j=i+1;j<this.players.length;j++){
         const p2 = this.players[j];
         if (p2.weaponType === 'unarmed') continue;
         const isScy2 = p2.weaponType === 'scythe';
         const start2 = p2.getWeaponBase ? p2.getWeaponBase() : null;
         const tip2 = p2.getWeaponTip ? p2.getWeaponTip() : null;
-        const poly2 = isScy2 ? buildScythePolygon(p2,26) : null;
+        const poly2 = isScy2 ? buildScythePolygon(p2, p2.scytheResolution) : null;
         let collides = false;
         if (!isScy1 && !isScy2) {
           if (segmentsIntersect(start1, tip1, start2, tip2)) collides = true;
@@ -638,9 +681,8 @@ class Game {
         if (target === arrow.owner) continue;
         let distSq = Infinity;
         if (target.weaponType === 'scythe') {
-          const poly = buildScythePolygon(target, 20);
+          const poly = buildScythePolygon(target, Math.max(10, target.scytheResolution || window.SCYTHE_DEFAULTS.resolution));
           if (pointInPolygon({x:arrow.x,y:arrow.y}, poly)) continue arrowLoop;
-          // fallback: distance to shaft centerline
           const centerLineStart = target.getWeaponBase ? target.getWeaponBase() : {x:target.x,y:target.y};
           const centerLineEnd = { x: target.x + Math.cos(target.weaponAngle) * (target.weaponLength || 80), y: target.y + Math.sin(target.weaponAngle) * (target.weaponLength || 80) };
           distSq = distancePointToSegmentSquared({x:arrow.x,y:arrow.y}, centerLineStart, centerLineEnd);
@@ -761,7 +803,7 @@ class Game {
         if (target === fb.owner) continue;
         let distSq = Infinity;
         if (target.weaponType === 'scythe') {
-          const poly = buildScythePolygon(target, 20);
+          const poly = buildScythePolygon(target, Math.max(10, target.scytheResolution || window.SCYTHE_DEFAULTS.resolution));
           if (pointInPolygon({x:fb.x,y:fb.y}, poly)) { this.explodeFireball(fb, time); continue fireLoop; }
           distSq = distancePointToPolylineSquared({x:fb.x,y:fb.y}, [ target.getWeaponBase(), target.getWeaponTip() ]);
         } else {
