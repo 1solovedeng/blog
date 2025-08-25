@@ -1,9 +1,4 @@
-/* 完整 game.js（修改版）
-   - weapon registry: registerWeapon/registerProjectile/registerSound
-   - scythe 判定改为: 棍子 + 半圆（可配置）
-   - 支持为武器和子弹加载贴图与声音，且绘制时会按角度旋转贴图
-   - 覆盖 Player.draw：绘制贴图武器、血量与黑色描边
-*/
+/* 完整 game.js（包含 ballbounce 声音播放，scythe => 棍子+半圆 判定，weapon registry 等） */
 
 /* ------------------ 基础环境 & UI ------------------ */
 const canvas = document.getElementById('gameCanvas');
@@ -68,13 +63,6 @@ function distancePointToPolylineSquared(pt, poly) {
 }
 
 /* ------------------ Weapon / Texture / Sound registry（方便扩展） ------------------ */
-/*
-  使用方式：
-  - registerWeapon({ key:'sword', name:'Sword', texture:'sword.png', thickness:8, baseRange:80, ... })
-  - registerProjectile({ key:'arrow', texture:'arrow.png', radius:4 })
-  - registerSound('hit','/path/hit.mp3')
-  - 调用 loadAssets() 或者 game.init() 时会自动加载贴图与音频元件
-*/
 window.WEAPON_REGISTRY = window.WEAPON_REGISTRY || {};
 window.PROJECTILE_REGISTRY = window.PROJECTILE_REGISTRY || {};
 window.SOUNDS = window.SOUNDS || {};
@@ -86,19 +74,16 @@ function registerWeapon(def) {
   window.WEAPON_REGISTRY[def.key] = Object.assign({
     name: def.key,
     texture: def.texture || null,
-    textureAnchor: def.textureAnchor || { x:0, y:0.5 }, // anchor in texture (0..1)
+    textureAnchor: def.textureAnchor || { x:0, y:0.5 },
     angleOffset: def.angleOffset || 0,
     thickness: def.thickness || 8,
     baseRange: def.baseRange || 80,
     collisionScale: def.collisionScale || 1.0,
-    // scythe specific defaults:
     scythe: def.scythe || { shaftRatio:0.55, bladeRadiusRatio:0.45, thicknessMultiplier:1.0, resolution:20 },
-    // optional callbacks
     onHit: def.onHit || null,
     onHitPlayer: def.onHitPlayer || null,
-    projectile: def.projectile || null // projectile key if this weapon fires one
+    projectile: def.projectile || null
   }, def);
-  // expose to window for legacy code compatibility
   window.WEAPON_TYPES = window.WEAPON_REGISTRY;
 }
 function registerProjectile(def) {
@@ -127,9 +112,8 @@ function playSound(name, volume=0.4) {
   } catch(e){/* ignore */ }
 }
 
-/* ------------------ Default registrations (示例，方便直接运行) ------------------ */
+/* ------------------ Default registrations（包含 ballbounce） ------------------ */
 (function setupDefaults(){
-  // example weapons
   registerWeapon({ key:'sword', name:'Sword', texture:'sword.png', thickness:8, baseRange:80 });
   registerWeapon({ key:'spear', name:'Spear', texture:'spear.png', thickness:8, baseRange:90 });
   registerWeapon({ key:'dagger', name:'Dagger', texture:'dagger.png', thickness:6, baseRange:50 });
@@ -139,16 +123,16 @@ function playSound(name, volume=0.4) {
     key:'scythe', name:'Scythe', texture:'scythe.png', thickness:14, baseRange:110,
     scythe: { shaftRatio:0.55, bladeRadiusRatio:0.45, thicknessMultiplier:1.0, resolution:26 }
   });
-  // projectiles
   registerProjectile({ key:'arrow', texture:'arrow.png', radius:4, speed:0.5 });
   registerProjectile({ key:'fireball', texture:'fireball.png', radius:10, speed:0.35 });
-  // sounds (paths relative to your assets folder — 可按需修改)
+  // register sounds (include ballbounce)
   registerSound('hit','/game/weaponballs/assets/sounds/hit.mp3');
   registerSound('swordsclash','/game/weaponballs/assets/sounds/swordsclash.mp3');
   registerSound('arrow','/game/weaponballs/assets/sounds/arrow.mp3');
+  registerSound('ballbounce','/game/weaponballs/assets/sounds/ballbounce.mp3');
 })();
 
-/* ------------------ Asset loader（贴图 + 声音） ------------------ */
+/* ------------------ Asset loader（贴图） ------------------ */
 function loadAllTexturesAndSounds(baseTexturePath='/game/weaponballs/assets/textures/') {
   const weaponKeys = Object.keys(window.WEAPON_REGISTRY || {});
   const projKeys = Object.keys(window.PROJECTILE_REGISTRY || {});
@@ -188,15 +172,6 @@ function loadAllTexturesAndSounds(baseTexturePath='/game/weaponballs/assets/text
 }
 
 /* ------------------ scythe polygon: 棍子 + 半圆 ------------------ */
-/*
-  返回点数组 polygon（用于 pointInPolygon / 边相交检测）
-  参数来源优先级：player属性 -> weaponDef.scythe -> 默认
-  player 可覆盖的 scythe 配置属性：
-    - scytheShaftRatio（0..1）
-    - scytheBladeRadiusRatio（0..1）
-    - scytheThicknessMultiplier（对 weaponThickness 的缩放）
-    - scytheResolution（半圆分割）
-*/
 function buildScythePolygon(player, resolutionOverride) {
   const base = (typeof player.getWeaponBase === 'function') ? player.getWeaponBase() : { x: player.x, y: player.y };
   const tip  = (typeof player.getWeaponTip === 'function') ? player.getWeaponTip() : { x: player.x + Math.cos(player.weaponAngle) * (player.weaponLength||80), y: player.y + Math.sin(player.weaponAngle) * (player.weaponLength||80) };
@@ -206,7 +181,6 @@ function buildScythePolygon(player, resolutionOverride) {
   const diry = (tip.y - base.y) / len;
   const nx = -diry, ny = dirx;
 
-  // get defaults
   const wdef = (window.WEAPON_REGISTRY && window.WEAPON_REGISTRY['scythe']) ? window.WEAPON_REGISTRY['scythe'].scythe : { shaftRatio:0.55, bladeRadiusRatio:0.45, thicknessMultiplier:1.0, resolution:20 };
   const shaftRatio = (typeof player.scytheShaftRatio === 'number') ? player.scytheShaftRatio : (wdef.shaftRatio || 0.55);
   const bladeRadiusRatio = (typeof player.scytheBladeRadiusRatio === 'number') ? player.scytheBladeRadiusRatio : (wdef.bladeRadiusRatio || 0.45);
@@ -217,16 +191,13 @@ function buildScythePolygon(player, resolutionOverride) {
   const bladeRadius = len * bladeRadiusRatio;
   const halfWidth = ((player.weaponThickness || ((window.WEAPON_REGISTRY[player.weaponType]&&window.WEAPON_REGISTRY[player.weaponType].thickness)||14)) * thicknessMul) / 2;
 
-  // shaft end: where semicircle center sits.
   const shaftEnd = { x: base.x + dirx * shaftLen, y: base.y + diry * shaftLen };
 
-  // rectangle corners for shaft
   const leftBase = { x: base.x + nx * halfWidth, y: base.y + ny * halfWidth };
   const rightBase = { x: base.x - nx * halfWidth, y: base.y - ny * halfWidth };
   const leftEnd = { x: shaftEnd.x + nx * halfWidth, y: shaftEnd.y + ny * halfWidth };
   const rightEnd = { x: shaftEnd.x - nx * halfWidth, y: shaftEnd.y - ny * halfWidth };
 
-  // semicircle points (front-facing relative to shaft direction)
   const baseAngle = Math.atan2(diry, dirx);
   const startAngle = baseAngle - Math.PI/2;
   const endAngle = baseAngle + Math.PI/2;
@@ -246,7 +217,7 @@ function buildScythePolygon(player, resolutionOverride) {
   return poly;
 }
 
-/* ------------------ Game class（保留你原有逻辑，但改为调用 registry） ------------------ */
+/* ------------------ Game class ------------------ */
 class Game {
   constructor(settings = {}) {
     this.settings = settings;
@@ -258,7 +229,7 @@ class Game {
     this.fireballs = [];
     this.explosionEffects = [];
     this.obstacles = [];
-    this.assetBasePath = '/game/weaponballs/assets/textures/'; // 默认贴图路径（可覆盖）
+    this.assetBasePath = '/game/weaponballs/assets/textures/';
     this.init();
   }
 
@@ -310,13 +281,11 @@ class Game {
         weaponAngle: Math.random() * Math.PI * 2
       });
 
-      // initialize weapon properties from registry defaults if present
       const wdef = (window.WEAPON_REGISTRY && window.WEAPON_REGISTRY[p.weaponType]) ? window.WEAPON_REGISTRY[p.weaponType] : null;
       if (wdef) {
         p.weaponThickness = p.weaponThickness || (wdef.thickness || 8);
         p.weaponLength = p.weaponLength || (wdef.baseRange || 80);
         p.textureAngleOffset = wdef.angleOffset || 0;
-        // scythe defaults
         if (p.weaponType === 'scythe') {
           if (typeof p.scytheShaftRatio !== 'number') p.scytheShaftRatio = (wdef.scythe && wdef.scythe.shaftRatio) || 0.55;
           if (typeof p.scytheBladeRadiusRatio !== 'number') p.scytheBladeRadiusRatio = (wdef.scythe && wdef.scythe.bladeRadiusRatio) || 0.45;
@@ -359,7 +328,6 @@ class Game {
     }
     this.obstacles = obs; window.OBSTACLES = obs;
 
-    // load textures defined in registry
     loadAllTexturesAndSounds(this.assetBasePath).then(()=>{
       requestAnimationFrame(this.loop.bind(this));
     }).catch(()=>{
@@ -392,7 +360,6 @@ class Game {
 
     for (const p of this.players) p.draw(ctx);
 
-    // debug scythe hitbox drawing if needed
     for (const p of this.players) {
       if (p.weaponType === 'scythe' && (p.debugShowScytheHitbox || false)) {
         const poly = buildScythePolygon(p, p.scytheResolution);
@@ -538,7 +505,6 @@ class Game {
             if (distSq < threshold*threshold/10) collides = true;
           }
         } else if (isScy1 && isScy2) {
-          // polygon-polygon: check edge intersections, then point containment
           outer:
           for (let a=0;a<poly1.length;a++){
             const a2=(a+1)%poly1.length;
@@ -551,7 +517,6 @@ class Game {
             if (pointInPolygon(poly1[0], poly2) || pointInPolygon(poly2[0], poly1)) collides = true;
           }
         } else {
-          // one scythe, one segment
           const seg = isScy1 ? { start: start2, end: tip2, segOwner: p2 } : { start: start1, end: tip1, segOwner: p1 };
           const scyPoly = isScy1 ? poly1 : poly2;
           if (segmentIntersectsPolygon(seg.start, seg.end, scyPoly)) collides = true;
@@ -615,12 +580,10 @@ class Game {
     attacker.lastHit[target.id] = time;
     if (attacker.weaponType === 'scythe') this.applyPoisonStack(attacker, target);
     if (typeof playSound === 'function') playSound('hit');
-    // optional weapon-specific callback
     if (def && typeof def.onHitPlayer === 'function') def.onHitPlayer(attacker, target, damage, time);
   }
 
   updateArrows(delta, time) {
-    // bow firing logic uses projectile registry if weapon has projectile set
     for (const p of this.players) {
       if (p.weaponType !== 'bow') continue;
       if (p.arrowCooldown === undefined) p.arrowCooldown = 1000;
@@ -661,15 +624,35 @@ class Game {
     arrowLoop:
     for (const arrow of this.arrows) {
       arrow.x += arrow.vx * delta; arrow.y += arrow.vy * delta;
-      if (arrow.x < -50 || arrow.x > width+50 || arrow.y < -50 || arrow.y > height+50) continue;
+
+      // boundary "bounce" sound and drop
+      if (arrow.x < 0 || arrow.x > width || arrow.y < 0 || arrow.y > height) {
+        if (typeof playSound === 'function') playSound('ballbounce');
+        continue;
+      }
+
       const arrowRadius = arrow.radius || 4;
+
+      // obstacle collisions for arrows: play bounce then remove
+      if (Array.isArray(this.obstacles)) {
+        let hitOb = false;
+        for (const ob of this.obstacles) {
+          if (arrow.x >= ob.x && arrow.x <= ob.x+ob.w && arrow.y >= ob.y && arrow.y <= ob.y+ob.h) {
+            // arrow hits obstacle — play bounce sound and remove arrow
+            if (typeof playSound === 'function') playSound('ballbounce');
+            hitOb = true;
+            break;
+          }
+        }
+        if (hitOb) continue;
+      }
+
       // check weapon parry collisions (if touches any weapon)
       for (const target of this.players) {
         if (target === arrow.owner) continue;
         if (target.weaponType === 'scythe') {
           const poly = buildScythePolygon(target, target.scytheResolution);
           if (pointInPolygon({x:arrow.x,y:arrow.y}, poly)) continue arrowLoop;
-          // fallback distance to shaft
           const centerLineStart = target.getWeaponBase ? target.getWeaponBase() : {x:target.x,y:target.y};
           const centerLineEnd = target.getWeaponTip ? target.getWeaponTip() : { x: target.x + Math.cos(target.weaponAngle)*(target.weaponLength||80), y: target.y + Math.sin(target.weaponAngle)*(target.weaponLength||80) };
           const dsq = distancePointToSegmentSquared({x:arrow.x,y:arrow.y}, centerLineStart, centerLineEnd);
@@ -763,12 +746,26 @@ class Game {
     fireLoop:
     for (const fb of this.fireballs) {
       fb.x += fb.vx * delta; fb.y += fb.vy * delta;
-      if (fb.x < -50 || fb.x > width+50 || fb.y < -50 || fb.y > height+50) { this.explodeFireball(fb, time); continue; }
-      if (Array.isArray(this.obstacles)) {
-        for (const ob of this.obstacles) {
-          if (fb.x >= ob.x && fb.x <= ob.x+ob.w && fb.y >= ob.y && fb.y <= ob.y+ob.h) { this.explodeFireball(fb, time); continue fireLoop; }
-        }
+
+      if (fb.x < 0 || fb.x > width || fb.y < 0 || fb.y > height) {
+        if (typeof playSound === 'function') playSound('ballbounce');
+        this.explodeFireball(fb, time);
+        continue;
       }
+
+      if (Array.isArray(this.obstacles)) {
+        let hitOb = false;
+        for (const ob of this.obstacles) {
+          if (fb.x >= ob.x && fb.x <= ob.x+ob.w && fb.y >= ob.y && fb.y <= ob.y+ob.h) {
+            // play bounce and explode
+            if (typeof playSound === 'function') playSound('ballbounce');
+            hitOb = true;
+            break;
+          }
+        }
+        if (hitOb) { this.explodeFireball(fb, time); continue fireLoop; }
+      }
+
       for (const target of this.players) {
         if (target === fb.owner) continue;
         if (target.weaponType === 'scythe') {
@@ -785,11 +782,13 @@ class Game {
           if (dsq <= threshold*threshold) { this.explodeFireball(fb, time); continue fireLoop; }
         }
       }
+
       for (const target of this.players) {
         if (target === fb.owner || target.health <= 0) continue;
         const dx = fb.x - target.x, dy = fb.y - target.y, dist = Math.hypot(dx,dy);
         if (dist <= target.radius) { this.explodeFireball(fb, time); continue fireLoop; }
       }
+
       stillActive.push(fb);
     }
     this.fireballs = stillActive;
@@ -997,14 +996,12 @@ function installPlayerDrawOverride() {
     const now = performance.now();
     ctx.save();
 
-    // body circle (with flash)
     const fillColor = (this.flashUntil && now < this.flashUntil && this.flashColor) ? this.flashColor : this.color;
     ctx.fillStyle = fillColor;
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
     ctx.fill();
 
-    // black outline
     try {
       const outlineWidth = Math.max(2, Math.min(6, Math.floor(this.radius * 0.12)));
       ctx.lineWidth = outlineWidth;
@@ -1013,7 +1010,6 @@ function installPlayerDrawOverride() {
     } catch (e) { /* ignore */ }
     ctx.closePath();
 
-    // weapon drawing (texture if exists)
     try {
       const base = (typeof this.getWeaponBase === 'function') ? this.getWeaponBase() : { x: this.x, y: this.y };
       const tip = (typeof this.getWeaponTip === 'function') ? this.getWeaponTip() : { x: this.x + (this.weaponLength || 30), y: this.y };
@@ -1024,14 +1020,12 @@ function installPlayerDrawOverride() {
       const img = window.WEAPON_TEXTURES && window.WEAPON_TEXTURES[this.weaponType];
 
       if (this.weaponType === 'scythe') {
-        // draw shaft line and semicircle blade on tip for visuals (if no texture)
         if (img && img.complete && img.naturalWidth) {
           ctx.translate(base.x, base.y);
           ctx.rotate(angle + (wdef && wdef.angleOffset || 0));
           ctx.drawImage(img, 0, -thickness/2, length, thickness);
           ctx.setTransform(1,0,0,1,0,0);
         } else {
-          // shaft
           ctx.strokeStyle = this.color;
           ctx.lineWidth = thickness;
           ctx.beginPath();
@@ -1039,76 +1033,9 @@ function installPlayerDrawOverride() {
           ctx.lineTo(tip.x, tip.y);
           ctx.stroke();
           ctx.closePath();
-          // semicircle at shaft end
           const shaftLen = length * (this.scytheShaftRatio || (wdef && wdef.scythe && wdef.scythe.shaftRatio) || 0.55);
           const shaftEnd = { x: base.x + Math.cos(angle) * shaftLen, y: base.y + Math.sin(angle) * shaftLen };
           const bladeRadius = length * (this.scytheBladeRadiusRatio || (wdef && wdef.scythe && wdef.scythe.bladeRadiusRatio) || 0.45);
           ctx.beginPath();
           const startA = angle - Math.PI/2, endA = angle + Math.PI/2;
-          ctx.moveTo(shaftEnd.x + Math.cos(startA)*bladeRadius, shaftEnd.y + Math.sin(startA)*bladeRadius);
-          ctx.arc(shaftEnd.x, shaftEnd.y, bladeRadius, startA, endA);
-          ctx.closePath();
-          ctx.fillStyle = this.color;
-          ctx.globalAlpha = 0.9;
-          ctx.fill();
-          ctx.globalAlpha = 1;
-        }
-      } else {
-        // generic drawing for other weapons
-        if (img && img.complete && img.naturalWidth) {
-          ctx.translate(base.x, base.y);
-          ctx.rotate(angle + (wdef && wdef.angleOffset || 0));
-          const anchor = (wdef && wdef.textureAnchor) ? wdef.textureAnchor : {x:0,y:0.5};
-          const nw = img.naturalWidth, nh = img.naturalHeight;
-          // draw image starting at base (0,0) with size length x thickness
-          ctx.drawImage(img, -anchor.x * length, -anchor.y * (thickness), length, thickness);
-          ctx.setTransform(1,0,0,1,0,0);
-        } else {
-          ctx.strokeStyle = this.color;
-          ctx.lineWidth = thickness;
-          ctx.beginPath();
-          ctx.moveTo(base.x, base.y);
-          ctx.lineTo(tip.x, tip.y);
-          ctx.stroke();
-          ctx.closePath();
-        }
-      }
-
-    } catch (e) { console.warn('Player draw error:', e); }
-
-    // health text
-    try {
-      const hp = Math.max(0, Math.round(this.health || 0));
-      const fontSize = Math.max(10, Math.floor(this.radius * 0.8));
-      ctx.font = `${fontSize}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.lineWidth = Math.max(2, Math.floor(fontSize / 6));
-      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-      ctx.strokeText(String(hp), this.x, this.y);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(String(hp), this.x, this.y);
-    } catch (e) { console.warn('Failed to draw health text:', e); }
-
-    ctx.restore();
-  };
-}
-installPlayerDrawOverride();
-
-/* -------------------- expose Game -------------------- */
-window.Game = Game;
-
-/* -------------------- 使用示例（可删除） -------------------- */
-/*
-  // 在外部新增武器示例：
-  registerWeapon({
-    key:'hammer',
-    name:'Hammer',
-    texture:'hammer.png',
-    thickness:18,
-    baseRange:70,
-    onHitPlayer: (attacker, target, dmg, time) => { console.log('hammer hit', attacker.id, target.id); }
-  });
-
-  // spawnConfig 中指定 weaponType:'hammer' 即可使用
-*/
+          ctx.moveTo(shaftEnd.x + Math.cos(startA)*bladeRadius, shaftEnd.y + Math.sin(*
