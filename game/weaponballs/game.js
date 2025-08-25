@@ -1,5 +1,15 @@
-/* 完整 game.js（包含“矩形 + 半圆”镰刀判定） */
-/* 请将此文件替换原来的 game.js —— 仅改动 game.js */
+/*
+ * game.js — 带贴图（箭/火球）与镰刀形状碰撞的完整实现
+ *
+ * 说明：
+ * - 纹理从 BASE_TEXTURE_PATH + file 加载（默认 'assets/textures/'）
+ * - 镰刀使用多段线拟合弧形刀刃，碰撞基于点到多段线距离
+ * - 箭与火球使用贴图并且判定半径使用贴图高度的半值（可微调）
+ *
+ * 请确保 Player 类存在 getWeaponBase/getWeaponTip/weaponAngle 等接口（与之前一致）。
+ */
+
+/* globals Player, WEAPON_TYPES, MAP_TYPE, WALKWAY_WIDTH, MAX_PLAYER_SPEED */
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -8,42 +18,58 @@ const restartButton = document.getElementById('restartButton');
 let width = canvas.width;
 let height = canvas.height;
 
-/* 配置贴图路径 & 元数据（如需） */
-const BASE_TEXTURE_PATH = 'assets/textures/';
+/* ---------------- config: textures ---------------- */
+const BASE_TEXTURE_PATH = 'assets/textures/'; // <- 如果你资源在 /game/weaponballs/assets/textures/ 请改为 '/game/weaponballs/assets/textures/'
+
 const TEXTURE_META = {
-  sword:   { file: 'sword.png',   anchor: { x: 0.06, y: 0.5 }, angleOffset: 0,           scale: 1.0, collisionScale: 1.0 },
-  spear:   { file: 'spear.png',   anchor: { x: 0.06, y: 0.5 }, angleOffset: 0,           scale: 1.0, collisionScale: 1.0 },
-  dagger:  { file: 'dagger.png',  anchor: { x: 0.06, y: 0.5 }, angleOffset: 0,           scale: 1.0, collisionScale: 1.0 },
-  bow:     { file: 'bow.png',     anchor: { x: 0.12, y: 0.5 }, angleOffset: 0.0,         scale: 1.0, collisionScale: 1.0 },
-  shield:  { file: 'shield.png',  anchor: { x: 0.02, y: 0.5 }, angleOffset: 0,           scale: 1.0, collisionScale: 1.0 },
-  scythe:  { file: 'scythe.png',  anchor: { x: 0.12, y: 0.5 }, angleOffset: -Math.PI/2, scale: 1.0, collisionScale: 1.0 },
-  arrow:   { file: 'arrow.png',   anchor: { x: 0.5,  y: 0.5 }, angleOffset: 0,           scale: 1.0, collisionScale: 1.0 },
-  fireball:{ file: 'fireball.png',anchor: { x: 0.5,  y: 0.5 }, angleOffset: 0,           scale: 1.0, collisionScale: 1.0 }
+  sword:     { file: 'sword.png',  anchor: { x: 0.05, y: 0.5 }, angleOffset: 0,        scale: 1.0, collisionScale: 1.0 },
+  spear:     { file: 'spear.png',  anchor: { x: 0.05, y: 0.5 }, angleOffset: 0,        scale: 1.0, collisionScale: 1.0 },
+  dagger:    { file: 'dagger.png', anchor: { x: 0.05, y: 0.5 }, angleOffset: 0,        scale: 1.0, collisionScale: 1.0 },
+  bow:       { file: 'bow.png',    anchor: { x: 0.12, y: 0.5 }, angleOffset: 0.75,     scale: 1.0, collisionScale: 1.0 },
+  shield:    { file: 'shield.png', anchor: { x: 0.02, y: 0.5 }, angleOffset: 0,        scale: 1.0, collisionScale: 1.0 },
+  scythe:    { file: 'scythe.png', anchor: { x: 0.12, y: 0.5 }, angleOffset: 0,        scale: 1.0, collisionScale: 1.0 },
+  // projectile textures
+  arrow:     { file: 'arrow.png',  anchor: { x: 0.5,  y: 0.5 }, angleOffset: 0,        scale: 1.0, collisionScale: 1.0 },
+  fireball:  { file: 'fireball.png', anchor: { x: 0.5, y: 0.5}, angleOffset: 0,       scale: 1.0, collisionScale: 1.0 }
 };
+
 window.WEAPON_TEXTURES = window.WEAPON_TEXTURES || {};
-function preloadTextures() {
-  for (const k in TEXTURE_META) {
-    const meta = TEXTURE_META[k];
+
+/* preload textures */
+function preloadWeaponTextures() {
+  for (const key in TEXTURE_META) {
+    const meta = TEXTURE_META[key];
     const img = new Image();
     img.src = BASE_TEXTURE_PATH + meta.file;
     img.__meta = meta;
-    img.__key = k;
+    img.__key = key;
     img.onload = function() {
       this.__loaded = true;
       this.__naturalWidth = this.naturalWidth || this.width;
       this.__naturalHeight = this.naturalHeight || this.height;
-      window.WEAPON_TEXTURES[k] = this;
+      window.WEAPON_TEXTURES[key] = this;
+      // If there is an active game, assign newly loaded texture to matching players
       if (window.game && Array.isArray(window.game.players)) {
-        window.game.players.forEach(p => { if (p.weaponType === k) assignTextureToPlayer(p, this, meta); });
+        window.game.players.forEach(p => {
+          if (p.weaponType === key || key === 'arrow' || key === 'fireball') {
+            // assign only when relevant: for players with weaponType matching
+            if (p.weaponType === key) assignTextureToPlayer(p, this, meta);
+          }
+        });
       }
     };
-    img.onerror = function(e) { console.warn('Texture failed to load:', meta.file, e); this.__loaded = false; window.WEAPON_TEXTURES[k] = this; };
-    window.WEAPON_TEXTURES[k] = img;
+    img.onerror = function(e) {
+      console.warn('Texture load error:', BASE_TEXTURE_PATH + meta.file, e);
+      this.__loaded = false;
+      window.WEAPON_TEXTURES[key] = this;
+    };
+    // immediate store
+    window.WEAPON_TEXTURES[key] = img;
   }
 }
-preloadTextures();
+preloadWeaponTextures();
 
-/* sounds */
+/* ---------------- sounds ---------------- */
 const SOUNDS = {};
 (() => {
   try {
@@ -55,159 +81,113 @@ const SOUNDS = {};
     console.warn('Failed to load audio assets:', e);
   }
 })();
-function playSound(name, volume = 0.4) { const base = SOUNDS[name]; if (!base) return; const inst = base.cloneNode(); inst.volume = volume; inst.play().catch(()=>{}); }
+function playSound(name, volume = 0.4) {
+  const base = SOUNDS[name];
+  if (!base) return;
+  const inst = base.cloneNode();
+  inst.volume = volume;
+  inst.play().catch(()=>{});
+}
 
-/* ---------- Geometry / collision helpers ---------- */
+/* --------------- geometry helpers ---------------- */
 function distancePointToSegmentSquared(p, v, w) {
-  const l2 = (v.x - w.x)*(v.x - w.x) + (v.y - w.y)*(v.y - w.y);
-  if (l2 === 0) { const dx = p.x - v.x, dy = p.y - v.y; return dx*dx + dy*dy; }
-  let t = ((p.x - v.x)*(w.x - v.x) + (p.y - v.y)*(w.y - v.y)) / l2;
+  const l2 = (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
+  if (l2 === 0) {
+    const dx = p.x - v.x, dy = p.y - v.y;
+    return dx*dx + dy*dy;
+  }
+  let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
   t = Math.max(0, Math.min(1, t));
-  const projx = v.x + t*(w.x - v.x);
-  const projy = v.y + t*(w.y - v.y);
+  const projx = v.x + t * (w.x - v.x);
+  const projy = v.y + t * (w.y - v.y);
   const dx = p.x - projx, dy = p.y - projy;
   return dx*dx + dy*dy;
 }
-function lineCircleCollision(a,b,c,r) { return distancePointToSegmentSquared(c, a, b) <= r*r; }
-function circleCollision(a,b) { const dx=a.x-b.x, dy=a.y-b.y, rr=a.radius+b.radius; return dx*dx+dy*dy<=rr*rr; }
-function orient(a,b,c) { return (b.x-a.x)*(c.y-a.y) - (b.y-a.y)*(c.x-a.x); }
+
+function lineCircleCollision(a, b, c, r) {
+  const dsq = distancePointToSegmentSquared(c, a, b);
+  return dsq <= r*r;
+}
+
+function circleCollision(a, b) {
+  const dx = a.x - b.x, dy = a.y - b.y, r = a.radius + b.radius;
+  return dx*dx + dy*dy <= r*r;
+}
+
 function segmentsIntersect(a1,a2,b1,b2) {
+  function orient(a,b,c) { return (b.x-a.x)*(c.y-a.y) - (b.y-a.y)*(c.x-a.x); }
   const o1 = orient(a1,a2,b1), o2 = orient(a1,a2,b2), o3 = orient(b1,b2,a1), o4 = orient(b1,b2,a2);
   if (o1*o2 < 0 && o3*o4 < 0) return true;
   return false;
 }
-function segmentDistanceSquared(a1,a2,b1,b2) {
+function segmentDistanceSquared(p1,p2,q1,q2) {
   return Math.min(
-    distancePointToSegmentSquared(a1,b1,b2),
-    distancePointToSegmentSquared(a2,b1,b2),
-    distancePointToSegmentSquared(b1,a1,a2),
-    distancePointToSegmentSquared(b2,a1,a2)
+    distancePointToSegmentSquared(p1,q1,q2),
+    distancePointToSegmentSquared(p2,q1,q2),
+    distancePointToSegmentSquared(q1,p1,p2),
+    distancePointToSegmentSquared(q2,p1,p2)
   );
 }
-function pointInPolygon(pt, poly) {
-  let c=false;
-  for (let i=0,j=poly.length-1;i<poly.length;j=i++) {
-    if (((poly[i].y>pt.y)!==(poly[j].y>pt.y)) && (pt.x < (poly[j].x-poly[i].x)*(pt.y-poly[i].y)/(poly[j].y-poly[i].y) + poly[i].x)) c = !c;
-  }
-  return c;
-}
-function polylineToThickPolygon(poly, thickness) {
-  if (!poly || poly.length < 2) return [];
-  const half = thickness/2;
-  const left=[], right=[];
-  for (let i=0;i<poly.length;i++){
-    const p = poly[i];
-    let tx,ty;
-    if (i===0) { tx = poly[i+1].x - p.x; ty = poly[i+1].y - p.y; }
-    else if (i===poly.length-1) { tx = p.x - poly[i-1].x; ty = p.y - poly[i-1].y; }
-    else { tx = poly[i+1].x - poly[i-1].x; ty = poly[i+1].y - poly[i-1].y; }
-    const len = Math.hypot(tx,ty) || 1;
-    const nx = -ty/len, ny = tx/len;
-    left.push({ x: p.x + nx*half, y: p.y + ny*half });
-    right.push({ x: p.x - nx*half, y: p.y - ny*half });
-  }
-  return left.concat(right.reverse());
-}
+
+/* distance from point to polyline (array of points) squared */
 function distancePointToPolylineSquared(pt, poly) {
   let best = Infinity;
   for (let i=0;i<poly.length-1;i++){
-    const a=poly[i], b=poly[i+1];
-    const d = distancePointToSegmentSquared(pt,a,b);
-    if (d<best) best = d;
+    const a = poly[i], b = poly[i+1];
+    const d = distancePointToSegmentSquared(pt, a, b);
+    if (d < best) best = d;
   }
   return best;
 }
-function segmentIntersectsPolygon(a,b,poly) {
-  if (pointInPolygon(a,poly) || pointInPolygon(b,poly)) return true;
-  for (let i=0;i<poly.length;i++){
-    const j=(i+1)%poly.length;
-    if (segmentsIntersect(a,b,poly[i],poly[j])) return true;
-  }
-  return false;
-}
 
-/* ---------------- SCYTHE defaults (global, 可修改) ---------------- */
-window.SCYTHE_DEFAULTS = {
-  shaftRatio: 0.55,
-  bladeRadiusRatio: 0.45,
-  resolution: 20,
-  widthMultiplier: 1.0,
-  debugShowHitbox: false
-};
-
-/* ------------------ 新：把镰刀做为“矩形（棍子） + 半圆（刀刃）”多边形 ------------------
-   返回顺时针或逆时针的点数组（用于 pointInPolygon / 边相交检测）
-   参数说明（可被 player 对象覆盖）：
-     p.scytheShaftRatio (默认 window.SCYTHE_DEFAULTS.shaftRatio)
-     p.scytheBladeRadiusRatio (默认 window.SCYTHE_DEFAULTS.bladeRadiusRatio)
-     p.scytheResolution (默认 window.SCYTHE_DEFAULTS.resolution)
-     p.scytheWidthMultiplier (默认 window.SCYTHE_DEFAULTS.widthMultiplier)
-
-   矩形从 base 到 shaftEnd，半圆以 shaftEnd 为圆心（沿 weaponAngle 的正面）
+/* build a scythe-like polyline for player p
+   - returns array of {x,y} points describing the blade centerline from base to tip
+   - uses weaponLength and an outward control offset to create curvature
 */
-function buildScythePolygon(p, resolution = undefined) {
-  const base = (typeof p.getWeaponBase === 'function') ? p.getWeaponBase() : { x: p.x, y: p.y };
-  const tip  = (typeof p.getWeaponTip === 'function') ? p.getWeaponTip() : { x: p.x + Math.cos(p.weaponAngle) * (p.weaponLength||80), y: p.y + Math.sin(p.weaponAngle) * (p.weaponLength||80) };
-
-  const len = Math.hypot(tip.x - base.x, tip.y - base.y) || (p.weaponLength || 80);
-  const dirx = (tip.x - base.x) / len;
-  const diry = (tip.y - base.y) / len;
-  const nx = -diry, ny = dirx; // outward normal (perp)
-
-  // get parameters with fallbacks
-  const shaftRatio = (typeof p.scytheShaftRatio === 'number') ? p.scytheShaftRatio : window.SCYTHE_DEFAULTS.shaftRatio;
-  const bladeRadiusRatio = (typeof p.scytheBladeRadiusRatio === 'number') ? p.scytheBladeRadiusRatio : window.SCYTHE_DEFAULTS.bladeRadiusRatio;
-  const res = (typeof p.scytheResolution === 'number') ? Math.max(6, Math.floor(p.scytheResolution)) : Math.max(6, Math.floor(resolution || window.SCYTHE_DEFAULTS.resolution));
-  const widthMul = (typeof p.scytheWidthMultiplier === 'number') ? p.scytheWidthMultiplier : window.SCYTHE_DEFAULTS.widthMultiplier;
-
-  const shaftLen = len * shaftRatio;
-  const bladeRadius = len * bladeRadiusRatio;
-  const halfWidth = ((p.weaponThickness || 14) * widthMul) / 2;
-
-  const shaftEnd = { x: base.x + dirx * shaftLen, y: base.y + diry * shaftLen };
-
-  const leftBase = { x: base.x + nx * halfWidth, y: base.y + ny * halfWidth };
-  const rightBase = { x: base.x - nx * halfWidth, y: base.y - ny * halfWidth };
-  const leftEnd = { x: shaftEnd.x + nx * halfWidth, y: shaftEnd.y + ny * halfWidth };
-  const rightEnd = { x: shaftEnd.x - nx * halfWidth, y: shaftEnd.y - ny * halfWidth };
-
-  // semicircle facing outward: angles from baseAngle - PI/2 to baseAngle + PI/2
-  const baseAngle = Math.atan2(diry, dirx);
-  const startAngle = baseAngle - Math.PI/2;
-  const endAngle = baseAngle + Math.PI/2;
-  const semiPoints = [];
-  for (let i=0;i<=res;i++){
-    const t = i / res;
-    const a = startAngle + (endAngle - startAngle) * t;
-    semiPoints.push({ x: shaftEnd.x + Math.cos(a) * bladeRadius, y: shaftEnd.y + Math.sin(a) * bladeRadius });
-  }
-
+function buildScythePolyline(p, segments = 12) {
+  const base = (typeof p.getWeaponBase === 'function') ? p.getWeaponBase() : {x:p.x, y:p.y};
+  const tip  = (typeof p.getWeaponTip === 'function') ? p.getWeaponTip() : {x: p.x + Math.cos(p.weaponAngle || 0) * (p.weaponLength||60), y: p.y + Math.sin(p.weaponAngle || 0) * (p.weaponLength||60)};
+  const dx = tip.x - base.x, dy = tip.y - base.y;
+  const len = Math.hypot(dx, dy) || (p.weaponLength || 60);
+  // normal perpendicular pointing to blade's outward side (rotate -90deg)
+  const nx = -dy / (len || 1);
+  const ny = dx / (len || 1);
+  // control offset magnitude: fraction of length (tweakable)
+  const controlMag = Math.max(8, len * 0.25);
+  // control point placed mid-way plus normal offset -> creates arc
+  const cx = base.x + dx * 0.5 + nx * controlMag;
+  const cy = base.y + dy * 0.5 + ny * controlMag;
+  // sample quadratic Bezier from base -> control -> tip
   const poly = [];
-  poly.push(leftBase);
-  poly.push(leftEnd);
-  for (let i=0;i<semiPoints.length;i++) poly.push(semiPoints[i]);
-  poly.push(rightEnd);
-  poly.push(rightBase);
-
+  for (let i=0;i<=segments;i++){
+    const t = i / segments;
+    const ix = (1-t)*(1-t)*base.x + 2*(1-t)*t*cx + t*t*tip.x;
+    const iy = (1-t)*(1-t)*base.y + 2*(1-t)*t*cy + t*t*tip.y;
+    poly.push({x:ix, y:iy});
+  }
   return poly;
 }
 
-/* ---------------- texture assignment helper ---------------- */
+/* ---------------- texture assignment to player ---------------- */
 function assignTextureToPlayer(p, img, meta) {
-  p.texture = img;
-  p.textureMeta = meta || img.__meta || {};
-  const nw = img.__naturalWidth || img.naturalWidth || img.width || 40;
-  const nh = img.__naturalHeight || img.naturalHeight || img.height || 8;
-  const scale = p.textureMeta.scale || 1.0;
-  p.weaponLength = (p.textureMeta.length || nw) * scale;
-  p.weaponThickness = nh * (p.textureMeta.collisionScale || 1.0) * scale;
-  const ax = (p.textureMeta.anchor && typeof p.textureMeta.anchor.x === 'number') ? p.textureMeta.anchor.x : 0;
-  const ay = (p.textureMeta.anchor && typeof p.textureMeta.anchor.y === 'number') ? p.textureMeta.anchor.y : 0.5;
-  p.textureAnchorPx = { x: nw * ax, y: nh * ay };
-  p.textureAngleOffset = p.textureMeta.angleOffset || 0;
+  try {
+    p.texture = img;
+    p.textureMeta = meta || img.__meta || {};
+    const nw = img.__naturalWidth || img.naturalWidth || img.width || 40;
+    const nh = img.__naturalHeight || img.naturalHeight || img.height || 8;
+    const scale = p.textureMeta.scale || 1.0;
+    p.weaponLength = (p.textureMeta.length || nw) * scale;
+    p.weaponThickness = nh * (p.textureMeta.collisionScale || 1.0) * scale;
+    const ax = (p.textureMeta.anchor && typeof p.textureMeta.anchor.x === 'number') ? p.textureMeta.anchor.x : 0;
+    const ay = (p.textureMeta.anchor && typeof p.textureMeta.anchor.y === 'number') ? p.textureMeta.anchor.y : 0.5;
+    p.textureAnchorPx = { x: nw * ax, y: nh * ay };
+    p.textureAngleOffset = p.textureMeta.angleOffset || 0;
+  } catch (e) {
+    console.warn('assignTextureToPlayer error', e);
+  }
 }
 
-/* ------------------ Game class ------------------ */
+/* ---------------- main Game class ---------------- */
 class Game {
   constructor(settings = {}) {
     this.settings = settings;
@@ -223,14 +203,14 @@ class Game {
 
   drawMapBackground() {
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0,0,width,height);
     if (typeof MAP_TYPE !== 'undefined' && MAP_TYPE === 'plus') {
-      const walkway = typeof WALKWAY_WIDTH !== 'undefined' ? WALKWAY_WIDTH : Math.min(width, height) * 0.4;
-      const half = walkway / 2;
-      const cx = width / 2, cy = height / 2;
+      const walkway = typeof WALKWAY_WIDTH !== 'undefined' ? WALKWAY_WIDTH : Math.min(width,height)*0.4;
+      const half = walkway/2;
+      const cx = width/2, cy = height/2;
       ctx.fillStyle = '#f3f3f3';
-      ctx.fillRect(0, cy - half, width, walkway);
-      ctx.fillRect(cx - half, 0, walkway, height);
+      ctx.fillRect(0, cy-half, width, walkway);
+      ctx.fillRect(cx-half, 0, walkway, height);
     }
     if (Array.isArray(this.obstacles)) {
       ctx.fillStyle = '#d0d0d0';
@@ -239,7 +219,8 @@ class Game {
   }
 
   init() {
-    width = canvas.width; height = canvas.height;
+    width = canvas.width;
+    height = canvas.height;
     let spawnConfigs;
     if (this.settings && Array.isArray(this.settings.spawnConfigs)) spawnConfigs = this.settings.spawnConfigs;
     else spawnConfigs = [
@@ -248,12 +229,14 @@ class Game {
       { x: 0.5, y: 0.5, weaponType: 'dagger', color: '#37D86B', health: 250 },
       { x: 0.75, y: 0.5, weaponType: 'sword', color: '#d46b15ff', health: 250 },
     ];
+
     this.players = [];
     spawnConfigs.forEach((cfg, index) => {
       const direction = index % 2 === 0 ? 1 : -1;
       let moveSpeed = 0.1;
       const def = (typeof WEAPON_TYPES !== 'undefined') ? WEAPON_TYPES[cfg.weaponType] : null;
       if (def && typeof def.moveSpeed === 'number') moveSpeed = def.moveSpeed;
+
       const p = new Player({
         id: index,
         x: width * cfg.x,
@@ -266,15 +249,20 @@ class Game {
         weaponType: cfg.weaponType,
         weaponAngle: Math.random() * Math.PI * 2
       });
+
       p.damage = p.damage || 1;
       p.damageDealt = 0;
       p.damageReceived = 0;
-      p.flashUntil = 0; p.weaponFlashUntil = 0; p.lastHit = p.lastHit || {};
+      p.flashUntil = 0;
+      p.weaponFlashUntil = 0;
+      p.lastHit = p.lastHit || {};
 
-      // assign texture if loaded
+      // assign texture if available
       const img = window.WEAPON_TEXTURES[cfg.weaponType];
-      if (img && img.__loaded) assignTextureToPlayer(p, img, img.__meta || TEXTURE_META[cfg.weaponType]);
-      else {
+      if (img && img.__loaded) {
+        assignTextureToPlayer(p, img, img.__meta || TEXTURE_META[cfg.weaponType]);
+      } else {
+        // fallback sizes (may be overridden on texture load)
         const fallbackLen = (def && def.baseRange) ? def.baseRange : 60;
         const fallbackTh = (def && def.thickness) ? def.thickness : 8;
         p.weaponLength = fallbackLen;
@@ -285,25 +273,23 @@ class Game {
         p.textureAngleOffset = (TEXTURE_META[cfg.weaponType] && TEXTURE_META[cfg.weaponType].angleOffset) || 0;
       }
 
-      // scythe specific defaults (可由 menu 或 spawnConfigs 覆盖)
-      if (p.weaponType === 'scythe') {
-        if (typeof p.scytheShaftRatio !== 'number') p.scytheShaftRatio = window.SCYTHE_DEFAULTS.shaftRatio;
-        if (typeof p.scytheBladeRadiusRatio !== 'number') p.scytheBladeRadiusRatio = window.SCYTHE_DEFAULTS.bladeRadiusRatio;
-        if (typeof p.scytheResolution !== 'number') p.scytheResolution = window.SCYTHE_DEFAULTS.resolution;
-        if (typeof p.scytheWidthMultiplier !== 'number') p.scytheWidthMultiplier = window.SCYTHE_DEFAULTS.widthMultiplier;
-        if (typeof p.debugShowScytheHitbox !== 'boolean') p.debugShowScytheHitbox = window.SCYTHE_DEFAULTS.debugShowHitbox;
-      }
-
       this.players.push(p);
     });
 
-    this.running = true; restartButton.hidden = true; this.lastTimestamp = performance.now();
-    this.pauseUntil = 0; this.deathEffects = []; this.arrows = []; this.fireballs = []; this.explosionEffects = [];
+    this.running = true;
+    restartButton.hidden = true;
+    this.lastTimestamp = performance.now();
+    this.pauseUntil = 0;
+    this.deathEffects = [];
+    this.arrows = [];
+    this.fireballs = [];
+    this.explosionEffects = [];
 
+    // obstacles
     const obs = [];
     if (typeof MAP_TYPE !== 'undefined') {
       if (MAP_TYPE === 'box') {
-        const boxW = width*0.6, boxH = height*0.6, boxX=(width-boxW)/2, boxY=(height-boxH)/2;
+        const boxW = width*0.6, boxH = height*0.6, boxX = (width-boxW)/2, boxY = (height-boxH)/2;
         obs.push({x:boxX,y:boxY,w:boxW,h:boxH});
       } else if (MAP_TYPE === 'battlefield') {
         const wallThickness = Math.max(20, Math.min(width,height)*0.03);
@@ -319,8 +305,12 @@ class Game {
         obs.push({x:cx+half,y:cy+half,w:width-(cx+half),h:height-(cy+half)});
       }
     }
-    this.obstacles = obs; window.OBSTACLES = obs;
+    this.obstacles = obs;
+    window.OBSTACLES = obs;
+
+    // expose global
     window.game = this;
+
     requestAnimationFrame(this.loop.bind(this));
   }
 
@@ -335,48 +325,61 @@ class Game {
     const paused = timestamp < this.pauseUntil;
     if (!paused) {
       for (const p of this.players) p.update(delta);
+
       for (let i=0;i<this.players.length;i++){
         for (let j=i+1;j<this.players.length;j++){
           const p1 = this.players[i], p2 = this.players[j];
           if (circleCollision(p1,p2)) resolveBodyCollision(p1,p2);
         }
       }
+
+      // weapon interactions
       this.handleWeaponInteractions(timestamp);
+
+      // arrows/fireballs
       this.updateArrows(delta, timestamp);
       if (typeof this.updateFireballs === 'function') this.updateFireballs(delta, timestamp);
+
       if (typeof this.updatePoisonEffects === 'function') this.updatePoisonEffects(delta, timestamp);
     }
 
+    // draw base player visuals (relies on Player.draw)
     for (const p of this.players) p.draw(ctx);
 
-    // 绘制武器纹理（保留你原来的绘制逻辑；scythe 仍然用纹理绘制，但判定使用多边形）
+    // draw textures for weapons (non-scythe use texture; scythe kept special)
     for (const p of this.players) {
       if (p.health <= 0) continue;
       try {
         if (p.weaponType === 'scythe') {
-          // 保留原版绘制（如 Player.draw 实现），不在这里覆盖。
-          if (!p.weaponLength) p.weaponLength = p.weaponLength || (WEAPON_TYPES && WEAPON_TYPES[p.weaponType] && WEAPON_TYPES[p.weaponType].baseRange) || 80;
+          // keep original scythe drawing by player.draw; but ensure weaponLength/thickness set
+          if (!p.weaponLength) p.weaponLength = p.weaponLength || (WEAPON_TYPES && WEAPON_TYPES[p.weaponType] && WEAPON_TYPES[p.weaponType].baseRange) || 60;
           if (!p.weaponThickness) p.weaponThickness = p.weaponThickness || (WEAPON_TYPES && WEAPON_TYPES[p.weaponType] && WEAPON_TYPES[p.weaponType].thickness) || 14;
           continue;
         }
+
         const img = (p.texture && p.texture.__loaded) ? p.texture : (window.WEAPON_TEXTURES[p.weaponType] || null);
         const meta = p.textureMeta || (img && img.__meta) || TEXTURE_META[p.weaponType] || null;
         const base = (typeof p.getWeaponBase === 'function') ? p.getWeaponBase() : {x:p.x, y:p.y};
         const angle = (p.weaponAngle || 0) + (p.textureAngleOffset || 0);
+
         if (img && img.__loaded && img.__naturalWidth > 0) {
           const nw = img.__naturalWidth, nh = img.__naturalHeight;
-          const intendedLen = p.weaponLength || (nw * (meta && meta.scale || 1));
+          const intendedLen = p.weaponLength || nw * (meta && meta.scale || 1);
           const scale = intendedLen / nw;
           const drawW = nw * scale, drawH = nh * scale;
           const anchorPx = p.textureAnchorPx || { x: (meta.anchor.x * nw), y: (meta.anchor.y * nh) };
+
           ctx.save();
           ctx.translate(base.x, base.y);
           ctx.rotate(angle);
           ctx.drawImage(img, -anchorPx.x * scale, -anchorPx.y * scale, drawW, drawH);
           ctx.restore();
+
+          // update weapon sizes used for collisions
           p.weaponLength = drawW;
           p.weaponThickness = drawH * (meta && meta.collisionScale ? meta.collisionScale : 1.0);
         } else {
+          // fallback shaft
           const len = p.weaponLength || 60;
           const bx = base.x, by = base.y;
           const tx = bx + Math.cos(p.weaponAngle) * len;
@@ -392,41 +395,26 @@ class Game {
           ctx.closePath();
           ctx.restore();
         }
-      } catch (e) { console.warn('weapon texture draw error', e); }
-    }
-
-    // 如果需要，绘制 scythe 判定区域用于调试
-    for (const p of this.players) {
-      if (p.weaponType === 'scythe' && (p.debugShowScytheHitbox || window.SCYTHE_DEFAULTS.debugShowHitbox)) {
-        const poly = buildScythePolygon(p, p.scytheResolution || window.SCYTHE_DEFAULTS.resolution);
-        if (poly && poly.length) {
-          ctx.save();
-          ctx.beginPath();
-          ctx.lineWidth = 2;
-          ctx.strokeStyle = 'rgba(255,0,0,0.9)';
-          ctx.fillStyle = 'rgba(255,0,0,0.12)';
-          ctx.moveTo(poly[0].x, poly[0].y);
-          for (let i=1;i<poly.length;i++) ctx.lineTo(poly[i].x, poly[i].y);
-          ctx.closePath();
-          ctx.fill();
-          ctx.stroke();
-          ctx.restore();
-        }
+      } catch (e) {
+        console.warn('draw weapon texture error', e);
       }
     }
 
+    // draw death effects, arrows, fireballs
     this.drawDeathEffects(timestamp);
     this.drawArrows();
     if (typeof this.drawFireballs === 'function') this.drawFireballs();
 
-    // draw player circles + black outline + health text
+    // draw outline and health on balls
     for (const p of this.players) {
+      if (p.health <= 0) continue;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
       ctx.lineWidth = Math.max(2, Math.round(Math.min(4, p.radius * 0.12)));
       ctx.strokeStyle = '#000';
       ctx.stroke();
       ctx.closePath();
+
       const healthText = String(Math.max(0, Math.round(p.health)));
       const fontSize = Math.max(10, Math.round(p.radius * 0.7));
       ctx.font = `bold ${fontSize}px sans-serif`;
@@ -440,34 +428,42 @@ class Game {
     }
 
     this.updateScoreboard();
+
     const survivors = this.players.filter(p => p.health > 0);
-    if (survivors.length <= 1) { this.running = false; this.showGameOver(survivors[0]); }
-    else requestAnimationFrame(this.loop.bind(this));
+    if (survivors.length <= 1) {
+      this.running = false;
+      this.showGameOver(survivors[0]);
+    } else {
+      requestAnimationFrame(this.loop.bind(this));
+    }
   }
 
   updateDeaths(time) {
     for (const p of this.players) {
       if (p.health <= 0 && !p.dead) {
-        p.health = 0; p.dead = true; p.vx = 0; p.vy = 0; p.rotationSpeed = 0;
+        p.health = 0;
+        p.dead = true;
+        p.vx = 0; p.vy = 0; p.rotationSpeed = 0;
         this.deathEffects.push({ x: p.x, y: p.y, color: p.color, start: time });
       }
     }
   }
 
   drawDeathEffects(time) {
-    const duration = 500; const stillActive = [];
+    const duration = 500;
+    const stillActive = [];
     for (const effect of this.deathEffects) {
       const progress = (time - effect.start) / duration;
       if (progress >= 1) continue;
       const maxR = effect.maxRadius || 40;
-      const color = effect.color || '#ffffff';
+      const color = effect.color || '#fff';
       const radius = progress * maxR;
       const alpha = 1 - progress;
       ctx.beginPath();
       let r=255,g=255,b=255;
-      if (color.startsWith('#')) {
+      if (color && color.startsWith && color.startsWith('#')) {
         const hex = color.replace('#','');
-        if (hex.length===6) { r = parseInt(hex.substring(0,2),16); g = parseInt(hex.substring(2,4),16); b = parseInt(hex.substring(4,6),16); }
+        if (hex.length===6){ r=parseInt(hex.substring(0,2),16); g=parseInt(hex.substring(2,4),16); b=parseInt(hex.substring(4,6),16); }
       }
       ctx.fillStyle = `rgba(${r},${g},${b},${alpha.toFixed(2)})`;
       ctx.arc(effect.x, effect.y, radius, 0, Math.PI*2);
@@ -478,23 +474,30 @@ class Game {
     this.deathEffects = stillActive;
   }
 
+  /* ---------------- weapon interactions (kept logic, with scythe handling) ---------------- */
   handleWeaponInteractions(time) {
     const hitCooldown = 300;
+
+    // unarmed body collisions (unchanged)
     for (let i=0;i<this.players.length;i++){
       const attacker = this.players[i];
       if (attacker.weaponType !== 'unarmed') continue;
       for (let j=0;j<this.players.length;j++){
         if (i===j) continue;
         const target = this.players[j];
-        if (target.health > 0 && circleCollision(attacker,target)) {
+        if (target.health > 0 && circleCollision(attacker, target)) {
           const extraDamage = attacker.accelSpeed * 8;
-          attacker.damage += extraDamage; attacker.accelSpeed /= 5;
+          attacker.damage += extraDamage;
+          attacker.accelSpeed /= 5;
           const last = attacker.lastHit[target.id] || 0;
           if (time - last > hitCooldown) {
-            const dx = attacker.x - target.x, dy = attacker.y - target.y, dist = Math.hypot(dx,dy);
+            const dx = attacker.x - target.x;
+            const dy = attacker.y - target.y;
+            const dist = Math.hypot(dx,dy);
             if (dist > 0) {
-              const nx = dx/dist, ny = dy/dist, kb = 1;
-              attacker.vx += nx*kb; attacker.vy += ny*kb; target.vx -= nx*kb; target.vy -= ny*kb;
+              const nx = dx/dist, ny = dy/dist, knockbackStrength = 1;
+              attacker.vx += nx * knockbackStrength; attacker.vy += ny * knockbackStrength;
+              target.vx -= nx * knockbackStrength; target.vy -= ny * knockbackStrength;
             }
             this.applyDamage(attacker, target, attacker.damage, time);
           }
@@ -502,121 +505,121 @@ class Game {
       }
     }
 
+    // melee weapon vs body detection (use line or scythe poly)
     for (let i=0;i<this.players.length;i++){
       const attacker = this.players[i];
-      const lineStartA = attacker.getWeaponBase ? attacker.getWeaponBase() : null;
       const tipA = attacker.getWeaponTip ? attacker.getWeaponTip() : null;
+      const lineStartA = attacker.getWeaponBase ? attacker.getWeaponBase() : null;
       for (let j=0;j<this.players.length;j++){
         if (i===j) continue;
         const target = this.players[j];
-        if (attacker.weaponType === 'bow' || attacker.weaponType === 'shield' || attacker.weaponType === 'staff') continue;
-        const effectiveRadius = target.radius + (attacker.weaponThickness || 8)/2;
-        let hit = false;
-        if (attacker.weaponType === 'scythe') {
-          const poly = buildScythePolygon(attacker, attacker.scytheResolution);
-          if (pointInPolygon({x:target.x,y:target.y}, poly)) hit = true;
-          else {
-            // fallback: distance to shaft centerline (approx)
-            const centerLineStart = attacker.getWeaponBase ? attacker.getWeaponBase() : {x:attacker.x,y:attacker.y};
-            const centerLineEnd = { x: attacker.x + Math.cos(attacker.weaponAngle) * (attacker.weaponLength || 80), y: attacker.y + Math.sin(attacker.weaponAngle) * (attacker.weaponLength || 80) };
-            const dsq = distancePointToSegmentSquared({x:target.x,y:target.y}, centerLineStart, centerLineEnd);
-            if (dsq <= effectiveRadius*effectiveRadius) hit = true;
+        if (attacker.weaponType !== 'bow' && attacker.weaponType !== 'shield' && attacker.weaponType !== 'staff') {
+          const effectiveRadius = target.radius + (attacker.weaponThickness || 8)/2;
+          let hit = false;
+          if (attacker.weaponType === 'scythe') {
+            const poly = buildScythePolyline(attacker);
+            const dsq = distancePointToPolylineSquared({x:target.x,y:target.y}, poly);
+            hit = dsq <= effectiveRadius * effectiveRadius;
+          } else {
+            if (lineStartA && tipA) {
+              hit = lineCircleCollision(lineStartA, tipA, {x:target.x, y:target.y}, effectiveRadius);
+            }
           }
-        } else {
-          if (lineStartA && tipA) {
-            hit = lineCircleCollision(lineStartA, tipA, {x:target.x,y:target.y}, effectiveRadius);
+          if (hit && target.health > 0) {
+            const last = attacker.lastHit[target.id] || 0;
+            if (time - last > hitCooldown) this.applyDamage(attacker, target, attacker.damage, time);
           }
-        }
-        if (hit && target.health > 0) {
-          const last = attacker.lastHit[target.id] || 0;
-          if (time - last > hitCooldown) this.applyDamage(attacker, target, attacker.damage, time);
         }
       }
     }
 
-    // weapon-weapon collisions (scythe uses polygon)
+    // weapon-to-weapon collisions (handle scythe specially)
     for (let i=0;i<this.players.length;i++){
       const p1 = this.players[i];
       if (p1.weaponType === 'unarmed') continue;
-      const isScy1 = p1.weaponType === 'scythe';
       const start1 = p1.getWeaponBase ? p1.getWeaponBase() : null;
       const tip1 = p1.getWeaponTip ? p1.getWeaponTip() : null;
-      const poly1 = isScy1 ? buildScythePolygon(p1, p1.scytheResolution) : null;
       for (let j=i+1;j<this.players.length;j++){
         const p2 = this.players[j];
         if (p2.weaponType === 'unarmed') continue;
-        const isScy2 = p2.weaponType === 'scythe';
         const start2 = p2.getWeaponBase ? p2.getWeaponBase() : null;
         const tip2 = p2.getWeaponTip ? p2.getWeaponTip() : null;
-        const poly2 = isScy2 ? buildScythePolygon(p2, p2.scytheResolution) : null;
+
         let collides = false;
-        if (!isScy1 && !isScy2) {
-          if (segmentsIntersect(start1, tip1, start2, tip2)) collides = true;
-          else {
+        // if neither is scythe, use segment intersection/distance
+        if (p1.weaponType !== 'scythe' && p2.weaponType !== 'scythe') {
+          collides = segmentsIntersect(start1, tip1, start2, tip2);
+          if (!collides) {
             const distSq = segmentDistanceSquared(start1, tip1, start2, tip2);
             const threshold = (p1.weaponThickness/2 + p2.weaponThickness/2);
             if (distSq < threshold*threshold/10) collides = true;
           }
-        } else if (isScy1 && isScy2) {
-          // polygon-polygon intersection: check edges
+        } else {
+          // at least one scythe -> compare polyline distance
+          const poly1 = (p1.weaponType === 'scythe') ? buildScythePolyline(p1) : [start1, tip1];
+          const poly2 = (p2.weaponType === 'scythe') ? buildScythePolyline(p2) : [start2, tip2];
+          // do coarse check: any segment pair intersects or close
           outer:
-          for (let a=0;a<poly1.length;a++){
-            const a2=(a+1)%poly1.length;
-            for (let b=0;b<poly2.length;b++){
-              const b2=(b+1)%poly2.length;
-              if (segmentsIntersect(poly1[a], poly1[a2], poly2[b], poly2[b2])) { collides = true; break outer; }
+          for (let a=0;a<poly1.length-1;a++){
+            for (let b=0;b<poly2.length-1;b++){
+              const a1 = poly1[a], a2 = poly1[a+1], b1 = poly2[b], b2 = poly2[b+1];
+              if (segmentsIntersect(a1,a2,b1,b2)) { collides = true; break outer; }
+              const d = segmentDistanceSquared(a1,a2,b1,b2);
+              const threshold = (p1.weaponThickness/2 + p2.weaponThickness/2);
+              if (d < (threshold*threshold)/10) { collides = true; break outer; }
             }
           }
-          if (!collides) {
-            if (pointInPolygon(poly1[0], poly2) || pointInPolygon(poly2[0], poly1)) collides = true;
-          }
-        } else {
-          // one scythe, one segment
-          const seg = isScy1 ? {start:start2,end:tip2,segOwner:p2} : {start:start1,end:tip1,segOwner:p1};
-          const scyPoly = isScy1 ? poly1 : poly2;
-          if (segmentIntersectsPolygon(seg.start, seg.end, scyPoly)) collides = true;
-          if (!collides && (pointInPolygon(seg.start, scyPoly) || pointInPolygon(seg.end, scyPoly))) collides = true;
         }
 
         if (collides) {
           if (typeof playSound === 'function') playSound('swordsclash');
           const parryFlashDuration = 50;
-          p1.weaponFlashUntil = Math.max(p1.weaponFlashUntil || 0, time + parryFlashDuration);
-          p2.weaponFlashUntil = Math.max(p2.weaponFlashUntil || 0, time + parryFlashDuration);
+          p1.weaponFlashUntil = Math.max(p1.weaponFlashUntil||0, time + parryFlashDuration);
+          p2.weaponFlashUntil = Math.max(p2.weaponFlashUntil||0, time + parryFlashDuration);
 
-          const isP1Shield = p1.weaponType === 'shield', isP2Shield = p2.weaponType === 'shield';
+          const isP1Shield = p1.weaponType === 'shield';
+          const isP2Shield = p2.weaponType === 'shield';
           if (isP1Shield !== isP2Shield) {
             const attacker = isP1Shield ? p2 : p1;
             const defender = isP1Shield ? p1 : p2;
             if (attacker.health > 0) {
-              attacker.health -= attacker.damage; if (attacker.health < 0) attacker.health = 0;
+              attacker.health -= attacker.damage;
+              if (attacker.health < 0) attacker.health = 0;
               if (typeof playSound === 'function') playSound('hit');
-              defender.damageDealt += attacker.damage; attacker.damageReceived += attacker.damage;
+              defender.damageDealt += attacker.damage;
+              attacker.damageReceived += attacker.damage;
               const def = WEAPON_TYPES[defender.weaponType];
               if (def && typeof def.buff === 'function') def.buff(defender);
-              const dxDef = attacker.x - defender.x, dyDef = attacker.y - defender.y, normDef = Math.hypot(dxDef,dyDef);
+              const dxDef = attacker.x - defender.x, dyDef = attacker.y - defender.y;
+              const normDef = Math.hypot(dxDef,dyDef);
               if (normDef > 0) {
                 const push = 1;
-                attacker.vx += (dxDef / normDef) * push; attacker.vy += (dyDef / normDef) * push;
+                attacker.vx += (dxDef / normDef) * push;
+                attacker.vy += (dyDef / normDef) * push;
                 if (typeof MAX_PLAYER_SPEED !== 'undefined') {
                   const spd = Math.hypot(attacker.vx, attacker.vy);
-                  if (spd > MAX_PLAYER_SPEED) { const scl = MAX_PLAYER_SPEED / spd; attacker.vx *= scl; attacker.vy *= scl; }
+                  if (spd > MAX_PLAYER_SPEED) { const scl = MAX_PLAYER_SPEED/spd; attacker.vx *= scl; attacker.vy *= scl; }
                 }
               }
               const flashDuration = 50;
-              attacker.flashColor = '#ff5555'; attacker.flashUntil = time + flashDuration;
+              attacker.flashColor = '#ff5555';
+              attacker.flashUntil = time + flashDuration;
               this.pauseUntil = time + flashDuration;
               if (!defender.lastHit) defender.lastHit = {};
               defender.lastHit[attacker.id] = time;
             }
           }
 
-          p1.weaponAngularVelocity *= -1; p2.weaponAngularVelocity *= -1;
+          // reverse rotation
+          p1.weaponAngularVelocity *= -1;
+          p2.weaponAngularVelocity *= -1;
           const dx = tip2.x - tip1.x, dy = tip2.y - tip1.y;
           const normal = Math.hypot(dx,dy);
           if (normal > 0) {
-            const nx = dx/normal, ny = dy/normal, knock = 0.05;
-            p1.vx -= nx*knock; p1.vy -= ny*knock; p2.vx += nx*knock; p2.vy += ny*knock;
+            const nx = dx/normal, ny = dy/normal;
+            const knock = 0.05;
+            p1.vx -= nx * knock; p1.vy -= ny * knock;
+            p2.vx += nx * knock; p2.vy += ny * knock;
           }
         }
       }
@@ -624,12 +627,15 @@ class Game {
   }
 
   applyDamage(attacker, target, damage, time) {
-    target.health -= damage; if (target.health < 0) target.health = 0;
-    attacker.damageDealt += damage; target.damageReceived += damage;
+    target.health -= damage;
+    if (target.health < 0) target.health = 0;
+    attacker.damageDealt += damage;
+    target.damageReceived += damage;
     const def = WEAPON_TYPES[attacker.weaponType];
     if (def && typeof def.buff === 'function') def.buff(attacker);
     const flashDuration = 50;
-    target.flashColor = '#ff5555'; target.flashUntil = time + flashDuration;
+    target.flashColor = '#ff5555';
+    target.flashUntil = time + flashDuration;
     this.pauseUntil = time + flashDuration;
     if (!attacker.lastHit) attacker.lastHit = {};
     attacker.lastHit[target.id] = time;
@@ -638,6 +644,7 @@ class Game {
   }
 
   updateArrows(delta, time) {
+    // spawn volleys
     for (const p of this.players) {
       if (p.weaponType !== 'bow') continue;
       if (p.arrowCooldown === undefined) p.arrowCooldown = 1000;
@@ -649,12 +656,13 @@ class Game {
         if (time >= p.nextArrowTime) {
           const angle = p.weaponAngle;
           const speed = 0.5;
-          const vx = Math.cos(angle)*speed, vy = Math.sin(angle)*speed;
+          const vx = Math.cos(angle) * speed, vy = Math.sin(angle) * speed;
           const start = p.getWeaponTip();
+          // create arrow object with visual rotation and texture if available
           const arrowImg = (window.WEAPON_TEXTURES['arrow'] && window.WEAPON_TEXTURES['arrow'].__loaded) ? window.WEAPON_TEXTURES['arrow'] : null;
           const arrowObj = { x: start.x, y: start.y, vx, vy, owner: p, damage: 1, img: arrowImg };
-          if (arrowImg && arrowImg.__naturalHeight) arrowObj.radius = (arrowImg.__naturalHeight * (arrowImg.__meta && arrowImg.__meta.scale||1))/2;
-          else arrowObj.radius = 4;
+          if (arrowImg && arrowImg.__naturalHeight) arrowObj.radius = (arrowImg.__naturalHeight * (arrowImg.__meta && arrowImg.__meta.scale || 1)) / 2;
+          else arrowObj.radius = 3;
           this.arrows.push(arrowObj);
           if (typeof playSound === 'function') playSound('arrow');
           p.arrowsRemaining -= 1;
@@ -666,7 +674,9 @@ class Game {
         }
       } else {
         if (time - p.lastArrowShotTime >= p.arrowCooldown) {
-          p.arrowsRemaining = p.arrowCount; p.lastArrowShotTime = time; p.nextArrowTime = time;
+          p.arrowsRemaining = p.arrowCount;
+          p.lastArrowShotTime = time;
+          p.nextArrowTime = time;
         }
       }
     }
@@ -674,43 +684,47 @@ class Game {
     const remaining = [];
     arrowLoop:
     for (const arrow of this.arrows) {
-      arrow.x += arrow.vx * delta; arrow.y += arrow.vy * delta;
+      arrow.x += arrow.vx * delta;
+      arrow.y += arrow.vy * delta;
       if (arrow.x < -50 || arrow.x > width+50 || arrow.y < -50 || arrow.y > height+50) continue;
+
+      // collision with weapons (parry); check against scythe poly or segment
       const arrowRadius = arrow.radius || 3;
       for (const target of this.players) {
         if (target === arrow.owner) continue;
+        const segStart = target.getWeaponBase();
+        const segEnd = target.getWeaponTip();
         let distSq = Infinity;
         if (target.weaponType === 'scythe') {
-          const poly = buildScythePolygon(target, Math.max(10, target.scytheResolution || window.SCYTHE_DEFAULTS.resolution));
-          if (pointInPolygon({x:arrow.x,y:arrow.y}, poly)) continue arrowLoop;
-          const centerLineStart = target.getWeaponBase ? target.getWeaponBase() : {x:target.x,y:target.y};
-          const centerLineEnd = { x: target.x + Math.cos(target.weaponAngle) * (target.weaponLength || 80), y: target.y + Math.sin(target.weaponAngle) * (target.weaponLength || 80) };
-          distSq = distancePointToSegmentSquared({x:arrow.x,y:arrow.y}, centerLineStart, centerLineEnd);
+          const poly = buildScythePolyline(target);
+          distSq = distancePointToPolylineSquared({x:arrow.x,y:arrow.y}, poly);
         } else {
-          const segStart = target.getWeaponBase();
-          const segEnd = target.getWeaponTip();
-          distSq = distancePointToSegmentSquared({ x: arrow.x, y: arrow.y }, segStart, segEnd);
+          distSq = distancePointToSegmentSquared({x:arrow.x,y:arrow.y}, segStart, segEnd);
         }
-        const threshold = ((target.weaponThickness || 8) / 2 + arrowRadius);
+        const threshold = ( (target.weaponThickness || 8) / 2 + arrowRadius );
         if (distSq <= threshold * threshold) {
           if (target.weaponType === 'shield') {
             const owner = arrow.owner;
             if (owner && owner.health > 0) {
               owner.health -= arrow.damage; if (owner.health < 0) owner.health = 0;
-              target.damageDealt += arrow.damage; owner.damageReceived += arrow.damage;
+              target.damageDealt += arrow.damage;
+              owner.damageReceived += arrow.damage;
               const def = WEAPON_TYPES[target.weaponType];
               if (def && typeof def.buff === 'function') def.buff(target);
-              const dx = owner.x - target.x, dy = owner.y - target.y, nrm = Math.hypot(dx,dy);
+              const dx = owner.x - target.x, dy = owner.y - target.y;
+              const nrm = Math.hypot(dx,dy);
               if (nrm > 0) {
                 const push = 0.1;
-                owner.vx += (dx / nrm) * push; owner.vy += (dy / nrm) * push;
+                owner.vx += (dx / nrm) * push;
+                owner.vy += (dy / nrm) * push;
                 if (typeof MAX_PLAYER_SPEED !== 'undefined') {
                   const spd2 = Math.hypot(owner.vx, owner.vy);
-                  if (spd2 > MAX_PLAYER_SPEED) { const scl2 = MAX_PLAYER_SPEED / spd2; owner.vx *= scl2; owner.vy *= scl2; }
+                  if (spd2 > MAX_PLAYER_SPEED) { const scl2 = MAX_PLAYER_SPEED/spd2; owner.vx *= scl2; owner.vy *= scl2; }
                 }
               }
               const flashDuration = 50;
-              owner.flashColor = '#ff5555'; owner.flashUntil = time + flashDuration;
+              owner.flashColor = '#ff5555';
+              owner.flashUntil = time + flashDuration;
               this.pauseUntil = time + flashDuration;
               if (!target.lastHit) target.lastHit = {};
               target.lastHit[owner.id] = time;
@@ -721,11 +735,12 @@ class Game {
         }
       }
 
+      // collision with body
       for (const target of this.players) {
         if (target === arrow.owner) continue;
         if (target.health <= 0) continue;
         const dx = arrow.x - target.x, dy = arrow.y - target.y;
-        if (dx*dx + dy*dy <= target.radius*target.radius) {
+        if (dx*dx + dy*dy <= target.radius * target.radius) {
           target.health -= arrow.damage; if (target.health < 0) target.health = 0;
           arrow.owner.damageDealt += arrow.damage; target.damageReceived += arrow.damage;
           const def = WEAPON_TYPES[arrow.owner.weaponType];
@@ -753,6 +768,8 @@ class Game {
         const nw = img.__naturalWidth, nh = img.__naturalHeight;
         const scale = ( (arrow.radius*2) / (nh*(img.__meta && img.__meta.collisionScale?img.__meta.collisionScale:1)) ) || 1;
         const drawW = nw * scale, drawH = nh * scale;
+        const anchorX = (img.__meta && img.__meta.anchor) ? img.__meta.anchor.x * nw * scale : -drawW/2;
+        const anchorY = (img.__meta && img.__meta.anchor) ? img.__meta.anchor.y * nh * scale : -drawH/2;
         ctx.drawImage(img, -drawW/2, -drawH/2, drawW, drawH);
         ctx.restore();
       } else {
@@ -782,7 +799,7 @@ class Game {
         const start = p.getWeaponTip();
         const fbImg = (window.WEAPON_TEXTURES['fireball'] && window.WEAPON_TEXTURES['fireball'].__loaded) ? window.WEAPON_TEXTURES['fireball'] : null;
         const fb = { x: start.x, y: start.y, vx, vy, owner: p, damage: p.fireballDamage, radius: p.fireballRadius, img: fbImg };
-        if (fbImg && fbImg.__naturalHeight) fb.radius = (fbImg.__naturalHeight * (fbImg.__meta && fbImg.__meta.scale||1))/2;
+        if (fbImg && fbImg.__naturalHeight) fb.radius = (fbImg.__naturalHeight * (fbImg.__meta && fbImg.__meta.scale || 1)) / 2;
         this.fireballs.push(fb);
         p.lastFireballTime = time;
         if (typeof playSound === 'function') playSound('arrow');
@@ -799,26 +816,29 @@ class Game {
           if (fb.x >= ob.x && fb.x <= ob.x+ob.w && fb.y >= ob.y && fb.y <= ob.y+ob.h) { this.explodeFireball(fb, time); continue fireLoop; }
         }
       }
+
+      // collision with weapon shafts (parry) - check scythe poly too
       for (const target of this.players) {
         if (target === fb.owner) continue;
         let distSq = Infinity;
         if (target.weaponType === 'scythe') {
-          const poly = buildScythePolygon(target, Math.max(10, target.scytheResolution || window.SCYTHE_DEFAULTS.resolution));
-          if (pointInPolygon({x:fb.x,y:fb.y}, poly)) { this.explodeFireball(fb, time); continue fireLoop; }
-          distSq = distancePointToPolylineSquared({x:fb.x,y:fb.y}, [ target.getWeaponBase(), target.getWeaponTip() ]);
+          const poly = buildScythePolyline(target);
+          distSq = distancePointToPolylineSquared({x:fb.x,y:fb.y}, poly);
         } else {
-          const segStart = target.getWeaponBase();
-          const segEnd = target.getWeaponTip();
+          const segStart = target.getWeaponBase(), segEnd = target.getWeaponTip();
           distSq = distancePointToSegmentSquared({x:fb.x,y:fb.y}, segStart, segEnd);
         }
-        const threshold = (target.weaponThickness || 8)/2 + 4;
-        if (distSq <= threshold*threshold) { this.explodeFireball(fb, time); continue fireLoop; }
+        const threshold = (target.weaponThickness/2 + 4);
+        if (distSq <= threshold * threshold) { this.explodeFireball(fb, time); continue fireLoop; }
       }
+
+      // collision with bodies
       for (const target of this.players) {
         if (target === fb.owner || target.health <= 0) continue;
         const dx = fb.x - target.x, dy = fb.y - target.y, dist = Math.hypot(dx,dy);
         if (dist <= target.radius) { this.explodeFireball(fb, time); continue fireLoop; }
       }
+
       stillActive.push(fb);
     }
     this.fireballs = stillActive;
@@ -846,32 +866,35 @@ class Game {
     this.deathEffects.push({ x: fb.x, y: fb.y, color: '#ff8800', maxRadius: fb.radius, start: time });
   }
 
-  applyPoisonStack(owner,target) {
-    const dmg = owner.poisonDamage || 0, dur = owner.poisonDuration || 0;
-    if (dmg>0 && dur>0) {
+  applyPoisonStack(owner, target) {
+    const dmg = owner.poisonDamage || 0;
+    const dur = owner.poisonDuration || 0;
+    if (dmg > 0 && dur > 0) {
       if (!Array.isArray(target.poisonStacks)) target.poisonStacks = [];
       target.poisonStacks.push({ owner, damage: dmg, remainingDamage: dmg, duration: dur, remainingTime: dur });
     }
   }
 
-  updatePoisonEffects(delta,time) {
+  updatePoisonEffects(delta, time) {
     for (const target of this.players) {
-      if (!Array.isArray(target.poisonStacks) || target.poisonStacks.length===0) continue;
-      const remaining=[];
+      if (!Array.isArray(target.poisonStacks) || target.poisonStacks.length === 0) continue;
+      const remainingStacks = [];
       for (const stack of target.poisonStacks) {
         const rate = stack.damage / stack.duration;
         const dmg = rate * delta;
         const actual = Math.min(dmg, stack.remainingDamage);
-        if (actual>0 && target.health>0) {
-          target.health -= actual; if (target.health<0) target.health=0;
+        if (actual > 0 && target.health > 0) {
+          target.health -= actual; if (target.health < 0) target.health = 0;
           stack.owner.damageDealt += actual; target.damageReceived += actual;
           target.flashColor = '#800080';
-          target.flashUntil = Math.max(target.flashUntil, time + 50);
+          const flashDuration = 50;
+          target.flashUntil = Math.max(target.flashUntil, time + flashDuration);
         }
-        stack.remainingDamage -= actual; stack.remainingTime -= delta;
-        if (stack.remainingDamage > 0 && stack.remainingTime > 0) remaining.push(stack);
+        stack.remainingDamage -= actual;
+        stack.remainingTime -= delta;
+        if (stack.remainingDamage > 0 && stack.remainingTime > 0) remainingStacks.push(stack);
       }
-      target.poisonStacks = remaining;
+      target.poisonStacks = remainingStacks;
     }
   }
 
@@ -881,11 +904,37 @@ class Game {
       if (img && img.__loaded && img.__naturalWidth > 0) {
         ctx.save();
         ctx.translate(fb.x, fb.y);
-        const s = img.__meta && img.__meta.scale ? img.__meta.scale : 1;
-        ctx.drawImage(img, - (img.__naturalWidth*s)/2, - (img.__naturalHeight*s)/2, img.__naturalWidth*s, img.__naturalHeight*s);
+        ctx.drawImage(img, - (img.__naturalWidth*(img.__meta&&img.__meta.scale||1))/2, - (img.__naturalHeight*(img.__meta&&img.__meta.scale||1))/2,
+                      (img.__naturalWidth*(img.__meta&&img.__meta.scale||1)), (img.__naturalHeight*(img.__meta&&img.__meta.scale||1)));
         ctx.restore();
       } else {
-        ctx.beginPath(); ctx.fillStyle='#ff8800'; ctx.arc(fb.x, fb.y, fb.radius||4, 0, Math.PI*2); ctx.fill(); ctx.closePath();
+        ctx.beginPath(); ctx.fillStyle = '#ff8800'; ctx.arc(fb.x, fb.y, fb.radius || 4, 0, Math.PI*2); ctx.fill(); ctx.closePath();
+      }
+    }
+  }
+
+  drawArrows() {
+    for (const arrow of this.arrows) {
+      const img = arrow.img;
+      if (img && img.__loaded && img.__naturalWidth > 0) {
+        ctx.save();
+        ctx.translate(arrow.x, arrow.y);
+        const angle = Math.atan2(arrow.vy, arrow.vx) + (img.__meta && img.__meta.angleOffset ? img.__meta.angleOffset : 0);
+        ctx.rotate(angle);
+        const nw = img.__naturalWidth, nh = img.__naturalHeight;
+        const scale = ( (arrow.radius*2) / (nh*(img.__meta && img.__meta.collisionScale?img.__meta.collisionScale:1)) ) || 1;
+        const drawW = nw * scale, drawH = nh * scale;
+        ctx.drawImage(img, -drawW/2, -drawH/2, drawW, drawH);
+        ctx.restore();
+      } else {
+        ctx.save();
+        ctx.translate(arrow.x, arrow.y);
+        const angle = Math.atan2(arrow.vy, arrow.vx);
+        ctx.rotate(angle);
+        ctx.fillStyle = arrow.owner.color;
+        const length = 20, thickness = arrow.radius*2 || 6;
+        ctx.fillRect(-length/2, -thickness/2, length, thickness);
+        ctx.restore();
       }
     }
   }
@@ -893,7 +942,7 @@ class Game {
   updateScoreboard() {
     let html = '';
     for (const p of this.players) {
-      const def = WEAPON_TYPES[p.weaponType] || { name: p.weaponType };
+      const def = WEAPON_TYPES[p.weaponType] || {name:p.weaponType};
       let line = `${def.name} | Health: ${Math.max(0, Math.round(p.health))}`;
       if (p.weaponType !== 'dummy') line += ` | Damage: ${p.damage.toFixed(1)}`;
       if (p.weaponType !== 'dummy' && p.weaponType !== 'unarmed') line += ` | Range: ${p.weaponLength?Math.round(p.weaponLength):0}`;
@@ -901,14 +950,16 @@ class Game {
         const mspd = def.moveSpeed !== undefined ? def.moveSpeed : 0;
         line += ` | Move: ${mspd.toFixed(2)}`;
       } else {
-        line += ` | Speed: ${(p.weaponAngularVelocity*1000 || 0).toFixed(2)}`;
+        line += ` | Speed: ${(p.weaponAngularVelocity * 1000 || 0).toFixed(2)}`;
       }
       if (p.weaponType === 'unarmed') {
         const accel = p.accelSpeed !== undefined ? p.accelSpeed : 0;
         const bonusDmg = (accel*2).toFixed(1);
         line += ` | Accel: ${accel.toFixed(2)} | A.Dmg: ${bonusDmg}`;
       }
-      if (p.weaponType === 'bow') line += ` | Arrows: ${p.arrowCount || 1}`;
+      if (p.weaponType === 'bow') {
+        const count = p.arrowCount !== undefined ? p.arrowCount : 1; line += ` | Arrows: ${count}`;
+      }
       if (p.weaponType === 'shield') line += ` | Width: ${Math.round(p.weaponThickness||0)}`;
       if (p.weaponType === 'staff') {
         const fd = p.fireballDamage !== undefined ? p.fireballDamage.toFixed(1) : '0';
@@ -945,35 +996,40 @@ class Game {
     panel.appendChild(winnerMsg);
     const table = document.createElement('table'); table.style.margin='0 auto'; table.style.borderCollapse='collapse'; table.style.minWidth='300px';
     const thead = document.createElement('thead'); const headerRow = document.createElement('tr');
-    ['Player','Weapon','Health','Damage Dealt','Damage Taken'].forEach(col=>{ const th=document.createElement('th'); th.textContent=col; th.style.padding='4px 8px'; th.style.borderBottom='2px solid #000'; headerRow.appendChild(th); });
+    ['Player','Weapon','Health','Damage Dealt','Damage Taken'].forEach(col=>{ const th=document.createElement('th'); th.textContent=col; th.style.padding='4px 8px'; th.style.borderBottom='2px solid #000'; headerRow.appendChild(th)});
     thead.appendChild(headerRow); table.appendChild(thead);
     const tbody = document.createElement('tbody');
     const sorted = players.slice().sort((a,b)=>b.damageDealt - a.damageDealt);
     sorted.forEach(p=>{
-      const tr=document.createElement('tr');
-      const tdName=document.createElement('td'); tdName.style.color=p.color; tdName.style.padding='4px 8px'; tdName.textContent=`Player ${p.id+1}`; tr.appendChild(tdName);
-      const tdWeapon=document.createElement('td'); tdWeapon.style.padding='4px 8px'; tdWeapon.textContent=p.weaponType; tr.appendChild(tdWeapon);
-      const tdHealth=document.createElement('td'); tdHealth.style.padding='4px 8px'; tdHealth.textContent=Math.max(0, Math.round(p.health)); tr.appendChild(tdHealth);
-      const tdDealt=document.createElement('td'); tdDealt.style.padding='4px 8px'; tdDealt.textContent=Math.round(p.damageDealt);
-      if (p.damageDealt === maxDealt && maxDealt>0) { tdDealt.style.fontWeight='bold'; tdDealt.style.backgroundColor='#d0ffd0'; }
+      const tr = document.createElement('tr');
+      const tdName = document.createElement('td'); tdName.style.color=p.color; tdName.style.padding='4px 8px'; tdName.textContent = `Player ${p.id+1}`; tr.appendChild(tdName);
+      const tdWeapon = document.createElement('td'); tdWeapon.style.padding='4px 8px'; tdWeapon.textContent = p.weaponType; tr.appendChild(tdWeapon);
+      const tdHealth = document.createElement('td'); tdHealth.style.padding='4px 8px'; tdHealth.textContent = Math.max(0, Math.round(p.health)); tr.appendChild(tdHealth);
+      const tdDealt = document.createElement('td'); tdDealt.style.padding='4px 8px'; tdDealt.textContent = Math.round(p.damageDealt);
+      if (p.damageDealt === maxDealt && maxDealt > 0) { tdDealt.style.fontWeight = 'bold'; tdDealt.style.backgroundColor = '#d0ffd0'; }
       tr.appendChild(tdDealt);
-      const tdTaken=document.createElement('td'); tdTaken.style.padding='4px 8px'; tdTaken.textContent=Math.round(p.damageReceived);
-      if (p.damageReceived === maxTaken && maxTaken>0) { tdTaken.style.fontWeight='bold'; tdTaken.style.backgroundColor='#ffd0d0'; }
+      const tdTaken = document.createElement('td'); tdTaken.style.padding='4px 8px'; tdTaken.textContent = Math.round(p.damageReceived);
+      if (p.damageReceived === maxTaken && maxTaken > 0) { tdTaken.style.fontWeight = 'bold'; tdTaken.style.backgroundColor = '#ffd0d0'; }
       tr.appendChild(tdTaken);
       tbody.appendChild(tr);
     });
     table.appendChild(tbody); panel.appendChild(table);
-    const note=document.createElement('p'); note.style.marginTop='10px'; note.style.fontSize='0.9em';
+    const note = document.createElement('p'); note.style.marginTop='10px'; note.style.fontSize='0.9em';
     note.innerHTML = '<span style="background:#d0ffd0;padding:2px 4px;">Most Dealt</span> <span style="background:#ffd0d0;padding:2px 4px;">Most Taken</span>';
     panel.appendChild(note);
     const btn = restartButton; btn.hidden = false;
     if (btn.parentElement !== panel) panel.appendChild(btn);
-    btn.onclick = () => { overlay.style.display = 'none'; if (window.currentSpawnConfigs) window.game = new Game({ spawnConfigs: window.currentSpawnConfigs }); else window.game = new Game(); btn.hidden = true; };
+    btn.onclick = ()=>{
+      overlay.style.display = 'none';
+      if (window.currentSpawnConfigs) game = new Game({ spawnConfigs: window.currentSpawnConfigs });
+      else game = new Game();
+      btn.hidden = true;
+    };
     overlay.innerHTML = ''; overlay.appendChild(panel); overlay.style.display = 'flex';
   }
 }
 
-/* resolveBodyCollision */
+/* resolveBodyCollision (unchanged) */
 function resolveBodyCollision(p1,p2) {
   const dx = p2.x - p1.x, dy = p2.y - p1.y;
   const dist = Math.sqrt(dx*dx + dy*dy);
@@ -987,12 +1043,15 @@ function resolveBodyCollision(p1,p2) {
   const kx = p1.vx - p2.vx, ky = p1.vy - p2.vy;
   const dot = kx * nx + ky * ny;
   if (dot > 0) return;
-  const damping = 0.2; const impulse = dot * damping;
+  const damping = 0.2;
+  const impulse = dot * damping;
   p1.vx -= impulse * nx; p1.vy -= impulse * ny;
   p2.vx += impulse * nx; p2.vy += impulse * ny;
   if (typeof MAX_PLAYER_SPEED !== 'undefined') {
-    const s1 = Math.hypot(p1.vx,p1.vy); if (s1 > MAX_PLAYER_SPEED) { const scale1 = MAX_PLAYER_SPEED / s1; p1.vx *= scale1; p1.vy *= scale1; }
-    const s2 = Math.hypot(p2.vx,p2.vy); if (s2 > MAX_PLAYER_SPEED) { const scale2 = MAX_PLAYER_SPEED / s2; p2.vx *= scale2; p2.vy *= scale2; }
+    const s1 = Math.hypot(p1.vx,p1.vy);
+    if (s1 > MAX_PLAYER_SPEED) { const scale1 = MAX_PLAYER_SPEED / s1; p1.vx *= scale1; p1.vy *= scale1; }
+    const s2 = Math.hypot(p2.vx,p2.vy);
+    if (s2 > MAX_PLAYER_SPEED) { const scale2 = MAX_PLAYER_SPEED / s2; p2.vx *= scale2; p2.vy *= scale2; }
   }
 }
 
