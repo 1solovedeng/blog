@@ -1,4 +1,4 @@
-/* 完整 game.js（包含 ballbounce 声音播放，scythe => 棍子+半圆 判定，weapon registry 等） */
+/* 完整 game.js（增加 staff 贴图 + 缩小 fireball） */
 
 /* ------------------ 基础环境 & UI ------------------ */
 const canvas = document.getElementById('gameCanvas');
@@ -112,20 +112,32 @@ function playSound(name, volume=0.4) {
   } catch(e){/* ignore */ }
 }
 
-/* ------------------ Default registrations（包含 ballbounce） ------------------ */
+/* ------------------ Default registrations（包含 ballbounce & staff/fireball 调整） ------------------ */
 (function setupDefaults(){
   registerWeapon({ key:'sword', name:'Sword', texture:'sword.png', thickness:8, baseRange:80 });
   registerWeapon({ key:'spear', name:'Spear', texture:'spear.png', thickness:8, baseRange:90 });
   registerWeapon({ key:'dagger', name:'Dagger', texture:'dagger.png', thickness:6, baseRange:50 });
   registerWeapon({ key:'bow', name:'Bow', texture:'bow.png', thickness:6, baseRange:70, projectile:'arrow' });
   registerWeapon({ key:'shield', name:'Shield', texture:'shield.png', thickness:28, baseRange:48 });
+
+  // scythe keeps same shape config
   registerWeapon({
     key:'scythe', name:'Scythe', texture:'scythe.png', thickness:14, baseRange:110,
     scythe: { shaftRatio:0.55, bladeRadiusRatio:0.45, thicknessMultiplier:1.0, resolution:26 }
   });
+
+  // STAFF: 新增法杖（贴图：staff.png）并将 projectile 指向 'fireball'
+  registerWeapon({
+    key:'staff', name:'Staff', texture:'staff.png', thickness:8, baseRange:50,
+    projectile: 'fireball', angleOffset: 0, textureAnchor: { x: 0, y: 0.5 }
+  });
+
+  // projectiles: arrow + fireball (fireball 默认较小)
   registerProjectile({ key:'arrow', texture:'arrow.png', radius:4, speed:0.5 });
-  registerProjectile({ key:'fireball', texture:'fireball.png', radius:10, speed:0.35 });
-  // register sounds (include ballbounce)
+  // 把 fireball 默认 radius 调小（例如 8 像素）。如果你想更小或更大，调整这里即可。
+  registerProjectile({ key:'fireball', texture:'fireball.png', radius:8, speed:0.35 });
+
+  // register sounds (请确保路径正确)
   registerSound('hit','/game/weaponballs/assets/sounds/hit.mp3');
   registerSound('swordsclash','/game/weaponballs/assets/sounds/swordsclash.mp3');
   registerSound('arrow','/game/weaponballs/assets/sounds/arrow.mp3');
@@ -168,6 +180,7 @@ function loadAllTexturesAndSounds(baseTexturePath='/game/weaponballs/assets/text
     }
   });
 
+  // Note: sounds are already registered with registerSound()
   return Promise.all(texturePromises);
 }
 
@@ -291,6 +304,15 @@ class Game {
           if (typeof p.scytheBladeRadiusRatio !== 'number') p.scytheBladeRadiusRatio = (wdef.scythe && wdef.scythe.bladeRadiusRatio) || 0.45;
           if (typeof p.scytheThicknessMultiplier !== 'number') p.scytheThicknessMultiplier = (wdef.scythe && wdef.scythe.thicknessMultiplier) || 1.0;
           if (typeof p.scytheResolution !== 'number') p.scytheResolution = (wdef.scythe && wdef.scythe.resolution) || 20;
+        }
+        // staff defaults: give them a reasonable small fireball radius if not set
+        if (p.weaponType === 'staff') {
+          const projKey = (wdef && wdef.projectile) || 'fireball';
+          const projDef = window.PROJECTILE_REGISTRY[projKey] || { radius: 8, speed: 0.35 };
+          if (p.fireballRadius === undefined) p.fireballRadius = projDef.radius || 8;
+          if (p.fireballDamage === undefined) p.fireballDamage = 2;
+          if (p.fireballCooldown === undefined) p.fireballCooldown = 1000;
+          if (p.lastFireballTime === undefined) p.lastFireballTime = 0;
         }
       } else {
         p.weaponThickness = p.weaponThickness || 8;
@@ -638,7 +660,6 @@ class Game {
         let hitOb = false;
         for (const ob of this.obstacles) {
           if (arrow.x >= ob.x && arrow.x <= ob.x+ob.w && arrow.y >= ob.y && arrow.y <= ob.y+ob.h) {
-            // arrow hits obstacle — play bounce sound and remove arrow
             if (typeof playSound === 'function') playSound('ballbounce');
             hitOb = true;
             break;
@@ -723,18 +744,23 @@ class Game {
   updateFireballs(delta, time) {
     for (const p of this.players) {
       if (p.weaponType !== 'staff') continue;
+
+      // ensure per-player defaults are based on projectile definition
+      const projKey = (window.WEAPON_REGISTRY[p.weaponType] && window.WEAPON_REGISTRY[p.weaponType].projectile) || 'fireball';
+      const projDef = window.PROJECTILE_REGISTRY[projKey] || { speed:0.35, radius:8 };
+
       if (p.lastFireballTime === undefined) p.lastFireballTime = 0;
       if (p.fireballCooldown === undefined) p.fireballCooldown = 1000;
       if (p.fireballDamage === undefined) p.fireballDamage = 2;
-      if (p.fireballRadius === undefined) p.fireballRadius = 40;
+      if (p.fireballRadius === undefined) p.fireballRadius = projDef.radius || 8;
+
       if (time - p.lastFireballTime >= p.fireballCooldown) {
         const angle = p.weaponAngle;
-        const projKey = (window.WEAPON_REGISTRY[p.weaponType] && window.WEAPON_REGISTRY[p.weaponType].projectile) || 'fireball';
-        const projDef = window.PROJECTILE_REGISTRY[projKey] || { speed:0.35, radius:6 };
         const speed = projDef.speed || 0.35;
         const vx = Math.cos(angle) * speed;
         const vy = Math.sin(angle) * speed;
         const start = p.getWeaponTip();
+        // use the per-player fireballRadius (defaulted above to projDef.radius)
         const fb = { x: start.x, y: start.y, vx, vy, owner: p, damage: p.fireballDamage, radius: p.fireballRadius, projKey };
         this.fireballs.push(fb);
         p.lastFireballTime = time;
@@ -757,7 +783,6 @@ class Game {
         let hitOb = false;
         for (const ob of this.obstacles) {
           if (fb.x >= ob.x && fb.x <= ob.x+ob.w && fb.y >= ob.y && fb.y <= ob.y+ob.h) {
-            // play bounce and explode
             if (typeof playSound === 'function') playSound('ballbounce');
             hitOb = true;
             break;
@@ -872,7 +897,8 @@ class Game {
     for (const fb of this.fireballs) {
       const tex = ptex[fb.projKey];
       if (tex && tex.complete && tex.naturalWidth) {
-        const s = fb.radius*2;
+        // draw using fb.radius as size basis
+        const s = Math.max(2, fb.radius*2);
         ctx.drawImage(tex, fb.x - s/2, fb.y - s/2, s, s);
       } else {
         ctx.beginPath(); ctx.fillStyle='#ff8800'; ctx.arc(fb.x, fb.y, fb.radius||4, 0, Math.PI*2); ctx.fill(); ctx.closePath();
@@ -1051,7 +1077,10 @@ function installPlayerDrawOverride() {
           ctx.translate(base.x, base.y);
           ctx.rotate(angle + (wdef && wdef.angleOffset || 0));
           const anchor = (wdef && wdef.textureAnchor) ? wdef.textureAnchor : {x:0,y:0.5};
-          ctx.drawImage(img, -anchor.x * length, -anchor.y * (thickness), length, thickness);
+          // drawImage: place using anchor relative to weapon length & thickness
+          const drawW = length;
+          const drawH = thickness;
+          ctx.drawImage(img, -anchor.x * drawW, -anchor.y * drawH, drawW, drawH);
           ctx.setTransform(1,0,0,1,0,0);
         } else {
           ctx.strokeStyle = this.color;
@@ -1089,6 +1118,8 @@ window.Game = Game;
 
 /* -------------------- 使用示例（可删除） -------------------- */
 /*
+  // 添加自定义武器/投射物示例：
   registerWeapon({ key:'hammer', name:'Hammer', texture:'hammer.png', thickness:18, baseRange:70 });
-  // spawnConfig 指定 weaponType:'hammer' 即可使用
+  registerProjectile({ key:'smallfire', texture:'smallfire.png', radius:5, speed:0.45 });
 */
+
