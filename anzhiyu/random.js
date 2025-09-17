@@ -1,3 +1,3 @@
-var posts=["posts/个人简历/","posts/力扣-1-两数之和（Two-Sum）/","posts/力扣-2-两数相加（Add-Two-Numbers）/","posts/力扣-3-无重复字符的最长子串（Longest-Substring-Without-Repeating-Characters）/","posts/实用工具-Dev-C++/","posts/项目推荐-SDL太空战机射击游戏-SDLShooter/"];function toRandomPost(){
+var posts=["posts/力扣-1-两数之和（Two-Sum）/","posts/力扣-2-两数相加（Add-Two-Numbers）/","posts/个人简历/","posts/力扣-3-无重复字符的最长子串（Longest-Substring-Without-Repeating-Characters）/","posts/力扣-4-寻找两个正序数组的中位数（Median of Two Sorted Arrays）/","posts/力扣-5-最长回文子串（longest_palindromic_substring）/","posts/力扣-6-z字变换（zig_zag_conversion）/","posts/力扣-7-整数反转（reverse_integer）/","posts/实用工具-Dev-C++/","posts/项目推荐-SDL太空战机射击游戏-SDLShooter/"];function toRandomPost(){
     pjax.loadUrl('/'+posts[Math.floor(Math.random() * posts.length)]);
   };
